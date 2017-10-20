@@ -40,9 +40,9 @@
     </description>
 
     <scm>
-        <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/bundles/extensions/serviceusermapper</connection>
-        <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/bundles/extensions/serviceusermapper</developerConnection>
-        <url>http://svn.apache.org/viewvc/sling/trunk/bundles/extensions/serviceusermapper</url>
+        <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-serviceusermapper.git</conncetion>
+        <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-serviceusermapper.git</developerConnection>
+        <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-serviceusermapper.git</url>
     </scm>
 
     <build>
