@@ -18,7 +18,7 @@
  */
 package org.apache.sling.serviceusermapping.impl;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -87,7 +87,7 @@ class Mapping implements Comparable<Mapping> {
 
     static Set<String> extractPrincipalNames(String s) {
         String[] sArr = s.substring(1, s.length() - 1).split(",");
-        Set<String> set = new HashSet<>();
+        Set<String> set = new LinkedHashSet<>();
         for (String name : sArr) {
             String n = name.trim();
             if (!n.isEmpty()) {
