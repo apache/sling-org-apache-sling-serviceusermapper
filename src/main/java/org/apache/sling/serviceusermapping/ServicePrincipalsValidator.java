@@ -28,7 +28,7 @@ public interface ServicePrincipalsValidator {
     /**
      * Validates the configured service principal names.
      *
-     * @param serviceUserId The principal names associated with the service.
+     * @param servicePrincipalNames The principal names associated with the service.
      * @param serviceName The name of the service
      * @param subServiceName The optional sub service name.
      * @return {@code true} if all configured service principal names are valid; {@code false} otherwise.
