@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.sling.serviceusermapping.impl;
+package org.apache.sling.serviceusermapping;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -25,13 +25,13 @@ import java.util.Set;
  * The <code>Mapping</code> class defines the mapping of a service's name and
  * optional service information to a user name and optionally to a set of principal names.
  */
-class Mapping implements Comparable<Mapping> {
+public class Mapping implements Comparable<Mapping> {
 
 
     /**
      * The name of the osgi property holding the service name.
      */
-    static String SERVICENAME = ".serviceName";
+    public static String SERVICENAME = ".serviceName";
 
     private final String serviceName;
 
@@ -54,7 +54,7 @@ class Mapping implements Comparable<Mapping> {
      * @throws IllegalArgumentException if {@code spec} does not match the
      *             expected pattern.
      */
-    Mapping(final String spec) {
+    public Mapping(final String spec) {
 
         final int colon = spec.indexOf(':');
         final int equals = spec.indexOf('=');
@@ -85,7 +85,7 @@ class Mapping implements Comparable<Mapping> {
         }
     }
 
-    static Set<String> extractPrincipalNames(String s) {
+    public static Set<String> extractPrincipalNames(String s) {
         String[] sArr = s.substring(1, s.length() - 1).split(",");
         Set<String> set = new LinkedHashSet<>();
         for (String name : sArr) {
@@ -108,7 +108,7 @@ class Mapping implements Comparable<Mapping> {
      *            {@code null}.
      * @return The user name if this mapping matches and the configuration doesn't specify a set of principal names; {@code null} otherwise.
      */
-    String map(final String serviceName, final String subServiceName) {
+    public String map(final String serviceName, final String subServiceName) {
         if (this.serviceName.equals(serviceName) && equals(this.subServiceName, subServiceName)) {
             return userName;
         }
@@ -130,7 +130,7 @@ class Mapping implements Comparable<Mapping> {
      * does specify a set of principal names (intstead of a single user name); {@code null}
      * otherwise.
      */
-    Iterable<String> mapPrincipals(final String serviceName, final String subServiceName) {
+    public Iterable<String> mapPrincipals(final String serviceName, final String subServiceName) {
         if (this.serviceName.equals(serviceName) && equals(this.subServiceName, subServiceName)) {
             return principalNames;
         }

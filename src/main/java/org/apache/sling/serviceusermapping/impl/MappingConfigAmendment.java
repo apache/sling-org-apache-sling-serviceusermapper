@@ -20,6 +20,7 @@ package org.apache.sling.serviceusermapping.impl;
 
 import java.util.ArrayList;
 
+import org.apache.sling.serviceusermapping.Mapping;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.ConfigurationPolicy;

@@ -30,6 +30,7 @@ import java.util.TreeMap;
 import org.apache.felix.inventory.Format;
 import org.apache.felix.inventory.InventoryPrinter;
 import org.apache.felix.utils.json.JSONWriter;
+import org.apache.sling.serviceusermapping.Mapping;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 

@@ -35,6 +35,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.sling.serviceusermapping.Mapping;
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
 import org.apache.sling.serviceusermapping.ServiceUserMapped;
 import org.apache.sling.serviceusermapping.ServiceUserMapper;
@@ -500,7 +501,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return bundle.getSymbolicName();
     }
 
-    List<Mapping> getActiveMappings() {
+    public List<Mapping> getActiveMappings() {
         return Collections.unmodifiableList(Arrays.asList(activeMappings));
     }
 

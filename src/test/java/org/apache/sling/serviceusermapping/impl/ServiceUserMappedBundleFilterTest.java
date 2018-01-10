@@ -21,6 +21,8 @@ package org.apache.sling.serviceusermapping.impl;
 
 
 import junit.framework.TestCase;
+
+import org.apache.sling.serviceusermapping.Mapping;
 import org.junit.Test;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;

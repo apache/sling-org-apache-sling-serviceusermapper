@@ -18,6 +18,8 @@
  */
 package org.apache.sling.serviceusermapping;
 
+import java.util.List;
+
 import org.osgi.annotation.versioning.ProviderType;
 import org.osgi.framework.Bundle;
 
@@ -57,33 +59,46 @@ import org.osgi.framework.Bundle;
 @ProviderType
 public interface ServiceUserMapper {
 
-    /**
-     * Returns the ID of a user to access the data store on behalf of the
-     * service.
-     *
-     * @param bundle The bundle implementing the service request access to
-     *            resources.
-     * @param subServiceName Name of the sub service. This parameter is optional and
-     *            may be an empty string or {@code null}.
-     * @return The ID of the user to use to provide access to the resources for
-     *         the service. This may be {@code null} if no particular user can
-     *         be derived for the service identified by the bundle and the
-     *         optional {@code serviceInfo}.
-     */
-    String getServiceUserID(Bundle bundle, String subServiceName);
+	/**
+	 * Returns the ID of a user to access the data store on behalf of the
+	 * service.
+	 *
+	 * @param bundle
+	 *            The bundle implementing the service request access to
+	 *            resources.
+	 * @param subServiceName
+	 *            Name of the sub service. This parameter is optional and may be
+	 *            an empty string or {@code null}.
+	 * @return The ID of the user to use to provide access to the resources for
+	 *         the service. This may be {@code null} if no particular user can
+	 *         be derived for the service identified by the bundle and the
+	 *         optional {@code serviceInfo}.
+	 */
+	String getServiceUserID(Bundle bundle, String subServiceName);
 
-    /**
-     * Returns the principal names to access the data store on behalf of the
-     * service.
-     *
-     * @param bundle The bundle implementing the service request access to resources.
-     * @param subServiceName Name of the sub service. This parameter is optional
-     *                       and may be an empty string or {@code null}.
-     * @return The principal names to use to provide access to the resources for
-     *         the service. This may be {@code null} if no mapping has been defined
-     *         for the service identified by the bundle and the optional {@code serviceInfo}
-     *         or if no principal names have been specified with the mapping.
-     *         In this case {@link #getServiceUserID(Bundle, String)} should be used instead.
-     */
-    Iterable<String> getServicePrincipalNames(Bundle bundle, String subServiceName);
+	/**
+	 * Returns the principal names to access the data store on behalf of the
+	 * service.
+	 *
+	 * @param bundle
+	 *            The bundle implementing the service request access to
+	 *            resources.
+	 * @param subServiceName
+	 *            Name of the sub service. This parameter is optional and may be
+	 *            an empty string or {@code null}.
+	 * @return The principal names to use to provide access to the resources for
+	 *         the service. This may be {@code null} if no mapping has been
+	 *         defined for the service identified by the bundle and the optional
+	 *         {@code serviceInfo} or if no principal names have been specified
+	 *         with the mapping. In this case
+	 *         {@link #getServiceUserID(Bundle, String)} should be used instead.
+	 */
+	Iterable<String> getServicePrincipalNames(Bundle bundle, String subServiceName);
+
+	/**
+	 * Returns a list of all of the active mappings in the Service User Mapper.
+	 * 
+	 * @return A list of the currently active mapped Service users
+	 */
+	List<Mapping> getActiveMappings();
 }

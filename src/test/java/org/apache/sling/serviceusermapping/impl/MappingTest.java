@@ -23,6 +23,8 @@ import java.util.Arrays;
 import java.util.Set;
 
 import junit.framework.TestCase;
+
+import org.apache.sling.serviceusermapping.Mapping;
 import org.junit.Test;
 
 public class MappingTest {
