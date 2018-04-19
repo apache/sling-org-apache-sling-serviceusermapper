@@ -64,6 +64,9 @@
                         <Embed-Dependency>
                              org.apache.felix.utils;inline=org/apache/felix/utils/json/JSONWriter**
                         </Embed-Dependency>
+                        <Provide-Capability>
+                            osgi.service;objectClass=org.apache.sling.serviceusermapping.ServiceUserMapped
+                        </Provide-Capability>
                     </instructions>
                 </configuration>
             </plugin>
