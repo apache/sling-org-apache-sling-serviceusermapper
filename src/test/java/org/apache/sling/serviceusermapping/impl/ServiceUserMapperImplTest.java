@@ -424,7 +424,7 @@ public class ServiceUserMapperImplTest {
         final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
         sum.configure(context.getBundleContext(), config);
 
-        TestCase.assertEquals(2, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+        TestCase.assertEquals(3, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
 
         final MappingConfigAmendment mca1 = new MappingConfigAmendment();
 
@@ -439,7 +439,7 @@ public class ServiceUserMapperImplTest {
         mca1.configure(mca1Config);
         sum.bindAmendment(mca1, mca1ConfigMap);
 
-        TestCase.assertEquals(3, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+        TestCase.assertEquals(4, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
 
         final MappingConfigAmendment mca2 = new MappingConfigAmendment();
 
@@ -454,11 +454,11 @@ public class ServiceUserMapperImplTest {
         mca2.configure(mca2Config);
         sum.bindAmendment(mca2, mca2ConfigMap);
 
-        TestCase.assertEquals(4, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+        TestCase.assertEquals(5, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
 
         sum.unbindAmendment(mca1, mca1ConfigMap);
 
-        TestCase.assertEquals(3, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+        TestCase.assertEquals(4, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
     }
 
 
@@ -466,6 +466,7 @@ public class ServiceUserMapperImplTest {
 
 
         final BundleContext bundleContext = mock(BundleContext.class);
+        final Bundle bundle = mock(Bundle.class);
         final Map<String, Map<Object, Dictionary>> registrations = new HashMap<>();
 
         public ServiceRegistrationContextHelper() {
@@ -478,6 +479,8 @@ public class ServiceUserMapperImplTest {
                             return registerService((String) arguments[0], arguments[1], (Dictionary) arguments[2]);
                         }
                     });
+            when(bundleContext.getBundle()).thenReturn(bundle);
+            when(bundle.getSymbolicName()).thenReturn("mock");
         }
 
         private ServiceRegistration registerService(String string, Object o, Dictionary dictionary) {
