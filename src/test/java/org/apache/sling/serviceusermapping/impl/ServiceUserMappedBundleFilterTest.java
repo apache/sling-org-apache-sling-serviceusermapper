@@ -53,12 +53,19 @@ public class ServiceUserMappedBundleFilterTest {
 
     final static BundleContext bundleContext1;
     final static BundleContext bundleContext2;
+    final static BundleContext mapperContext;
 
     static  {
+        Bundle mapper = mock(Bundle.class);
+        when(mapper.getSymbolicName()).thenReturn("mapper");
+        mapperContext = mock(BundleContext.class);
+        when(mapperContext.getBundle()).thenReturn(mapper);
+
         bundleContext1 = mock(BundleContext.class);
         Bundle bundle1 = mock(Bundle.class);
         when(bundleContext1.getBundle()).thenReturn(bundle1);
         when(bundle1.getSymbolicName()).thenReturn(BUNDLE1);
+
 
 
         bundleContext2 = mock(BundleContext.class);
@@ -83,12 +90,24 @@ public class ServiceUserMappedBundleFilterTest {
         when(serviceEvent.getServiceReference()).thenReturn(serviceReference);
         when(serviceReference.getProperty(Constants.OBJECTCLASS)).thenReturn(new String[]{ServiceUserMappedImpl.SERVICEUSERMAPPED});
         when(serviceReference.getProperty(Mapping.SERVICENAME)).thenReturn(BUNDLE1);
+        when(serviceEvent.getType()).thenReturn(ServiceEvent.REGISTERED);
 
 
-        EventListenerHook eventListenerHook = new ServiceUserMappedBundleFilter();
-        eventListenerHook.event(serviceEvent, map);
+        ServiceUserMappedBundleFilter eventListenerHook = new ServiceUserMappedBundleFilter();
 
-        TestCase.assertEquals(1, map.size());
+        eventListenerHook.mapper = new ServiceUserMapperImpl();
+        eventListenerHook.start(mapperContext);
+
+        Map<BundleContext, Collection<ListenerHook.ListenerInfo>> map1 = new HashMap<>(map);
+        eventListenerHook.event(serviceEvent, map1);
+
+        TestCase.assertEquals(0, map1.size());
+
+        Map<BundleContext, Collection<ListenerHook.ListenerInfo>> map2 = new HashMap<>(map);
+        eventListenerHook.mapper.useDefaultMapping = true;
+        eventListenerHook.event(serviceEvent, map2);
+
+        TestCase.assertEquals(1, map2.size());
         TestCase.assertTrue(map.containsKey(bundleContext1));
 
     }
@@ -108,10 +127,24 @@ public class ServiceUserMappedBundleFilterTest {
         when(serviceReference2.getProperty(Mapping.SERVICENAME)).thenReturn(BUNDLE2);
         when(serviceReference2.getProperty(Constants.OBJECTCLASS)).thenReturn(new String[]{ServiceUserMappedImpl.SERVICEUSERMAPPED});
 
-        FindHook findHook = new ServiceUserMappedBundleFilter();
-        findHook.find(bundleContext1, null, null, false, collection);
+        ServiceUserMappedBundleFilter findHook = new ServiceUserMappedBundleFilter();
 
-        TestCase.assertEquals(1, collection.size());
+        findHook.mapper = new ServiceUserMapperImpl();
+        findHook.start(mapperContext);
+
+        List collection1 = new ArrayList(collection);
+        findHook.find(bundleContext1, null, null, false, collection1);
+
+        TestCase.assertEquals(0, collection1.size());
+
+        findHook.mapper.useDefaultMapping = true;
+
+        List collection2 = new ArrayList(collection);
+        findHook.find(bundleContext1, null, null, false, collection2);
+
+        TestCase.assertEquals(1, collection2.size());
         TestCase.assertTrue(collection.contains(serviceReference1));
+
+
     }
 }

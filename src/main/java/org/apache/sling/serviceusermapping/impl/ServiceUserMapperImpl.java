@@ -34,6 +34,7 @@ import java.util.TreeSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.sling.serviceusermapping.Mapping;
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
@@ -81,7 +82,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         @AttributeDefinition(name = "Default Mapping",
                 description = "If enabled and no mapping for a requested service user exists and no " +
                       " default user is defined, a " +
-                     "default mapping is applied which uses the service user \"serviceuser@\" + {bundleId} + [\":\" + subServiceName]")
+                     "default mapping is applied which uses the service user \"serviceuser--\" + bundleId + [\"--\" + subServiceName]")
         boolean user_enable_default_mapping() default true;
     }
 
@@ -92,7 +93,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private String defaultUser;
 
-    private boolean useDefaultMapping;
+    volatile boolean useDefaultMapping;
 
     private Map<Long, MappingConfigAmendment> amendments = new HashMap<>();
 
@@ -108,7 +109,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private ExecutorService executorService;
 
-    public boolean registerAsync = true;
+    boolean registerAsync = true;
+
+    private final AtomicReference<ServiceRegistration> defaultRegistration = new AtomicReference<>();
 
     @Activate
     @Modified
@@ -340,6 +343,10 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private void executeServiceRegistrations(final RegistrationSet registrationSet) {
 
+        ServiceRegistration reg = defaultRegistration.getAndSet(null);
+        if (reg != null) {
+            reg.unregister();
+        }
         if (registrationSet == null) {
             return;
         }
@@ -388,6 +395,16 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             }
         }
 
+        if (this.useDefaultMapping || (defaultUser != null && !defaultUser.isEmpty())) {
+            Dictionary<String, Object> properties = new Hashtable<>();
+            properties.put(Mapping.SERVICENAME, getServiceName(savedBundleContext.getBundle()));
+            final ServiceRegistration serviceRegistration = savedBundleContext.registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
+                new ServiceUserMappedImpl(), properties);
+            ServiceRegistration oldServiceRegistration = this.defaultRegistration.getAndSet(serviceRegistration);
+            if (oldServiceRegistration != null) {
+                oldServiceRegistration.unregister();
+            }
+        }
     }
 
     private String internalGetUserId(final String serviceName, final String subServiceName) {
@@ -417,7 +434,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         }
 
         // use default mapping if configured and no default user
-        if ( this.defaultUser == null || this.defaultUser.isEmpty() ) {
+        if ( this.useDefaultMapping && (this.defaultUser == null || this.defaultUser.isEmpty() )) {
             final String userName = "serviceuser--" + serviceName + (subServiceName == null ? "" : "--" + subServiceName);
             log.debug("internalGetUserId: no mapping found, using default mapping [{}]", userName);
             return userName;
@@ -497,7 +514,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return null;
     }
 
-    static String getServiceName(final Bundle bundle) {
+    String getServiceName(final Bundle bundle) {
         return bundle.getSymbolicName();
     }
 
