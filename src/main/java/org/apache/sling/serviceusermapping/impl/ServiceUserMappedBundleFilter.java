@@ -108,11 +108,11 @@ public class ServiceUserMappedBundleFilter implements EventListenerHook, FindHoo
     private boolean isValid(Bundle bundle, Object serviceName, String subserviceName) {
         String bundleServiceName = mapper.getServiceName(bundle);
         if (bundleServiceName.equals(serviceName)) {
-            Iterable<String> principals = mapper.getServicePrincipalNames(bundle, subserviceName);
+            Iterable<String> principals = mapper.getServicePrincipalNamesInternal(bundle, subserviceName);
             if (principals != null && principals.iterator().hasNext()) {
                 return true;
             }
-            String user = mapper.getServiceUserID(bundle, subserviceName);
+            String user = mapper.getServiceUserIDInternal(bundle, subserviceName);
             if (user != null && !user.isEmpty()) {
                 return true;
             }
@@ -130,11 +130,11 @@ public class ServiceUserMappedBundleFilter implements EventListenerHook, FindHoo
                              return false;
                          }
                      }
-                     Iterable<String> principals = mapper.getServicePrincipalNames(bundle, subserviceName);
+                     Iterable<String> principals = mapper.getServicePrincipalNamesInternal(bundle, subserviceName);
                      if (principals != null && principals.iterator().hasNext()) {
                          return true;
                      }
-                     String user = mapper.getServiceUserID(bundle, subserviceName);
+                     String user = mapper.getServiceUserIDInternal(bundle, subserviceName);
                      if (user != null && !user.isEmpty()) {
                          return true;
                      }

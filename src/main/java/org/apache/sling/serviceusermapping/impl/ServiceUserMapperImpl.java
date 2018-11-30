@@ -84,6 +84,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
                       " default user is defined, a " +
                      "default mapping is applied which uses the service user \"serviceuser--\" + bundleId + [\"--\" + subServiceName]")
         boolean user_enable_default_mapping() default true;
+
+        boolean require_validation() default false;
     }
 
     /** default log */
@@ -110,6 +112,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     private ExecutorService executorService;
 
     boolean registerAsync = true;
+
+    private volatile boolean requireValidation = false;
 
     private final AtomicReference<ServiceRegistration> defaultRegistration = new AtomicReference<>();
 
@@ -141,6 +145,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         }
         this.defaultUser = config.user_default();
         this.useDefaultMapping = config.user_enable_default_mapping();
+        this.requireValidation = config.require_validation();
 
         RegistrationSet registrationSet = null;
         this.bundleContext = bundleContext;
@@ -175,7 +180,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     @Reference(cardinality=ReferenceCardinality.MULTIPLE, policy= ReferencePolicy.DYNAMIC)
     protected synchronized void bindServiceUserValidator(final ServiceUserValidator serviceUserValidator) {
         userValidators.add(serviceUserValidator);
-        restartAllActiveServiceUserMappedServices();
+        if (!requireValidation || !principalsValidators.isEmpty()) {
+            restartAllActiveServiceUserMappedServices();
+        }
     }
 
     /**
@@ -194,7 +201,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     @Reference(cardinality=ReferenceCardinality.MULTIPLE, policy= ReferencePolicy.DYNAMIC)
     protected synchronized void bindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator) {
         principalsValidators.add(servicePrincipalsValidator);
-        restartAllActiveServiceUserMappedServices();
+        if (!requireValidation || !userValidators.isEmpty()) {
+            restartAllActiveServiceUserMappedServices();
+        }
     }
 
     /**
@@ -213,7 +222,18 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     public String getServiceUserID(final Bundle bundle, final String subServiceName) {
         final String serviceName = getServiceName(bundle);
         final String userId = internalGetUserId(serviceName, subServiceName);
-        final boolean valid = isValidUser(userId, serviceName, subServiceName);
+        final boolean valid = isValidUser(userId, serviceName, subServiceName, false);
+        final String result = valid ? userId : null;
+        log.debug(
+                "getServiceUserID(bundle {}, subServiceName {}) returns [{}] (raw userId={}, valid={})",
+                new Object[] { bundle, subServiceName, result, userId, valid });
+        return result;
+    }
+
+    String getServiceUserIDInternal(final Bundle bundle, final String subServiceName) {
+        final String serviceName = getServiceName(bundle);
+        final String userId = internalGetUserId(serviceName, subServiceName);
+        final boolean valid = isValidUser(userId, serviceName, subServiceName, requireValidation);
         final String result = valid ? userId : null;
         log.debug(
                 "getServiceUserID(bundle {}, subServiceName {}) returns [{}] (raw userId={}, valid={})",
@@ -228,7 +248,18 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     public Iterable<String> getServicePrincipalNames(Bundle bundle, String subServiceName) {
         final String serviceName = getServiceName(bundle);
         final Iterable<String> names = internalGetPrincipalNames(serviceName, subServiceName);
-        final boolean valid = areValidPrincipals(names, serviceName, subServiceName);
+        final boolean valid = areValidPrincipals(names, serviceName, subServiceName, false);
+        final Iterable<String> result = valid ? names : null;
+        log.debug(
+                "getServicePrincipalNames(bundle {}, subServiceName {}) returns [{}] (raw principalNames={}, valid={})",
+                new Object[] { bundle, subServiceName, result, names, valid});
+        return result;
+    }
+
+    Iterable<String> getServicePrincipalNamesInternal(Bundle bundle, String subServiceName) {
+        final String serviceName = getServiceName(bundle);
+        final Iterable<String> names = internalGetPrincipalNames(serviceName, subServiceName);
+        final boolean valid = areValidPrincipals(names, serviceName, subServiceName, requireValidation);
         final Iterable<String> result = valid ? names : null;
         log.debug(
                 "getServicePrincipalNames(bundle {}, subServiceName {}) returns [{}] (raw principalNames={}, valid={})",
@@ -343,7 +374,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private void executeServiceRegistrations(final RegistrationSet registrationSet) {
 
-        ServiceRegistration reg = defaultRegistration.getAndSet(null);
+            ServiceRegistration reg = defaultRegistration.getAndSet(null);
         if (reg != null) {
             reg.unregister();
         }
@@ -444,12 +475,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return this.defaultUser;
     }
 
-    private boolean isValidUser(final String userId, final String serviceName, final String subServiceName) {
+    private boolean isValidUser(final String userId, final String serviceName, final String subServiceName, boolean require) {
         if (userId == null) {
             log.debug("isValidUser: userId is null -> invalid");
             return false;
         }
-        if ( !userValidators.isEmpty() ) {
+        if ( !userValidators.isEmpty()  || require) {
             for (final ServiceUserValidator validator : userValidators) {
                 if ( validator.isValid(userId, serviceName, subServiceName) ) {
                     log.debug("isValidUser: Validator {} accepts userId [{}] -> valid", validator, userId);
@@ -464,12 +495,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         }
     }
 
-    private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName) {
+    private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
         if (principalNames == null) {
             log.debug("areValidPrincipals: principalNames are null -> invalid");
             return false;
         }
-        if ( !principalsValidators.isEmpty() ) {
+        if ( !principalsValidators.isEmpty() || require ) {
             for (final ServicePrincipalsValidator validator : principalsValidators) {
                 if ( validator.isValid(principalNames, serviceName, subServiceName) ) {
                     log.debug("areValidPrincipals: Validator {} accepts principal names [{}] -> valid", validator, principalNames);
