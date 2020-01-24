@@ -425,14 +425,6 @@ public class ServiceUserMapperImplTest {
         final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
         final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(context.getBundleContext(), config, executor);
 
-        while (context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED) == null
-                || context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size() < 3) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                // ignore
-            }
-        }
         TestCase.assertEquals(3, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
 
         final MappingConfigAmendment mca1 = new MappingConfigAmendment();
