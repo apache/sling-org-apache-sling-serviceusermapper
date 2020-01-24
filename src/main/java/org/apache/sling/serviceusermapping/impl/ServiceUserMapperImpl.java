@@ -155,8 +155,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
-        RegistrationSet registrationSet = null;
-        registrationSet = this.updateMappings();
+        RegistrationSet registrationSet = this.updateMappings();
 
         this.executeServiceRegistrationsAsync(registrationSet);
     }
@@ -312,9 +311,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         activeMappings = mappings.toArray(new Mapping[mappings.size()]);
         log.debug("Active mappings updated: {} mappings active", mappings.size());
 
-        RegistrationSet registrationSet = updateServiceRegistrations(activeMappings);
-
-        return registrationSet;
+        return updateServiceRegistrations(activeMappings);
 
     }
 
@@ -363,16 +360,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private void executeServiceRegistrations(final RegistrationSet registrationSet) {
 
-        ServiceRegistration reg = defaultRegistration.getAndSet(null);
+        final ServiceRegistration reg = defaultRegistration.getAndSet(null);
         if (reg != null) {
             reg.unregister();
         }
-        if (registrationSet == null) {
-            return;
-        }
 
         for (final Registration registration : registrationSet.removed) {
-
 
             ServiceRegistration serviceRegistration = registration.setService(null);
 
@@ -416,10 +409,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             final ServiceRegistration serviceRegistration = bundleContext
                     .registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
                 new ServiceUserMappedImpl(), properties);
-            ServiceRegistration oldServiceRegistration = this.defaultRegistration.getAndSet(serviceRegistration);
-            if (oldServiceRegistration != null) {
-                oldServiceRegistration.unregister();
-            }
+            this.defaultRegistration.set(serviceRegistration);
         }
     }
 
