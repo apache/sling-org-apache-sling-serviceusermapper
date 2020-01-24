@@ -20,7 +20,14 @@
 package org.apache.sling.serviceusermapping.impl;
 
 
-import junit.framework.TestCase;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.sling.serviceusermapping.Mapping;
 import org.junit.Test;
@@ -29,18 +36,9 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.framework.ServiceEvent;
 import org.osgi.framework.ServiceReference;
-import org.osgi.framework.hooks.service.EventListenerHook;
-import org.osgi.framework.hooks.service.FindHook;
 import org.osgi.framework.hooks.service.ListenerHook;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import junit.framework.TestCase;
 
 /**
  * Test reference and bundle filtering based on <code>Mapping.SERVICENAME</code>
@@ -95,7 +93,8 @@ public class ServiceUserMappedBundleFilterTest {
 
         ServiceUserMappedBundleFilter eventListenerHook = new ServiceUserMappedBundleFilter();
 
-        eventListenerHook.mapper = new ServiceUserMapperImpl();
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        eventListenerHook.mapper = new ServiceUserMapperImpl(null, config);
         eventListenerHook.start(mapperContext);
 
         Map<BundleContext, Collection<ListenerHook.ListenerInfo>> map1 = new HashMap<>(map);
@@ -103,8 +102,9 @@ public class ServiceUserMappedBundleFilterTest {
 
         TestCase.assertEquals(0, map1.size());
 
+        when(config.user_enable_default_mapping()).thenReturn(true);
+        eventListenerHook.mapper.configure(config);
         Map<BundleContext, Collection<ListenerHook.ListenerInfo>> map2 = new HashMap<>(map);
-        eventListenerHook.mapper.useDefaultMapping = true;
         eventListenerHook.event(serviceEvent, map2);
 
         TestCase.assertEquals(1, map2.size());
@@ -114,7 +114,7 @@ public class ServiceUserMappedBundleFilterTest {
 
     @Test
     public void testFind() {
-        List collection = new ArrayList<ServiceReference>();
+        List<ServiceReference> collection = new ArrayList<>();
 
         ServiceReference serviceReference1 = mock(ServiceReference.class);
         ServiceReference serviceReference2 = mock(ServiceReference.class);
@@ -129,17 +129,19 @@ public class ServiceUserMappedBundleFilterTest {
 
         ServiceUserMappedBundleFilter findHook = new ServiceUserMappedBundleFilter();
 
-        findHook.mapper = new ServiceUserMapperImpl();
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        findHook.mapper = new ServiceUserMapperImpl(null, config);
         findHook.start(mapperContext);
 
-        List collection1 = new ArrayList(collection);
+        List<ServiceReference> collection1 = new ArrayList<>(collection);
         findHook.find(bundleContext1, null, null, false, collection1);
 
         TestCase.assertEquals(0, collection1.size());
 
-        findHook.mapper.useDefaultMapping = true;
+        when(config.user_enable_default_mapping()).thenReturn(true);
+        findHook.mapper.configure(config);
 
-        List collection2 = new ArrayList(collection);
+        List<ServiceReference> collection2 = new ArrayList<>(collection);
         findHook.find(bundleContext1, null, null, false, collection2);
 
         TestCase.assertEquals(1, collection2.size());

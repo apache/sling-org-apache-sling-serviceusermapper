@@ -32,10 +32,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
 import org.apache.sling.serviceusermapping.ServiceUserValidator;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.osgi.framework.Bundle;
@@ -107,8 +110,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         TestCase.assertEquals(SAMPLE, sum.getServiceUserID(BUNDLE1, null));
         TestCase.assertEquals(ANOTHER, sum.getServiceUserID(BUNDLE2, null));
@@ -132,8 +134,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(true);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         TestCase.assertEquals(SAMPLE, sum.getServiceUserID(BUNDLE1, null));
         TestCase.assertEquals(ANOTHER, sum.getServiceUserID(BUNDLE2, null));
@@ -157,8 +158,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(null);
         when(config.user_enable_default_mapping()).thenReturn(true);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         TestCase.assertEquals(SAMPLE, sum.getServiceUserID(BUNDLE1, null));
         TestCase.assertEquals(ANOTHER, sum.getServiceUserID(BUNDLE2, null));
@@ -182,8 +182,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
         ServiceUserValidator serviceUserValidator = new ServiceUserValidator() {
 
             @Override
@@ -218,8 +217,7 @@ public class ServiceUserMapperImplTest {
                 BUNDLE_SYMBOLIC2 + ":" + SUB + "=[" + SAMPLE_SUB + "," + ANOTHER_SUB + "]" //
         });
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE1, null), SAMPLE);
         assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE2, null), ANOTHER);
@@ -238,8 +236,7 @@ public class ServiceUserMapperImplTest {
                 BUNDLE_SYMBOLIC2 + "=[ " + ANOTHER + " ]", //
         });
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE1, ""), SAMPLE);
         assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE2, ""), ANOTHER);
@@ -255,8 +252,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
         assertNull(SAMPLE_SUB, sum.getServicePrincipalNames(BUNDLE1, SUB));
@@ -268,8 +264,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(true);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
         assertNull(sum.getServicePrincipalNames(BUNDLE1, SUB));
@@ -285,8 +280,7 @@ public class ServiceUserMapperImplTest {
                 BUNDLE_SYMBOLIC2 + ":" + SUB + "=[" + ANOTHER_SUB + "," + SAMPLE_SUB + "," + SAMPLE + "]"//
         });
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
         ServicePrincipalsValidator validator = new ServicePrincipalsValidator() {
             @Override
             public boolean isValid(Iterable<String> servicePrincipalNames, String serviceName, String subServiceName) {
@@ -334,8 +328,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
         final MappingConfigAmendment mca1 = new MappingConfigAmendment();
 
         MappingConfigAmendment.Config mca1Config = mock(MappingConfigAmendment.Config.class);
@@ -376,8 +369,7 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.configure(null, config);
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
 
         final MappingConfigAmendment mca1 = new MappingConfigAmendment();
 
@@ -419,11 +411,28 @@ public class ServiceUserMapperImplTest {
         when(config.user_default()).thenReturn(NONE);
         when(config.user_enable_default_mapping()).thenReturn(false);
 
-        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl();
-        sum.registerAsync = false;
-        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
-        sum.configure(context.getBundleContext(), config);
+        ArgumentCaptor<Runnable> argument = ArgumentCaptor.forClass(Runnable.class);
 
+        final ExecutorService executor = mock(ExecutorService.class);
+        when(executor.submit(argument.capture())).thenAnswer(new Answer<Future<Object>>() {
+            @Override
+            public Future<Object> answer(InvocationOnMock invocation) {
+                argument.getValue().run();
+                return null;
+            }
+        });
+
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(context.getBundleContext(), config, executor);
+
+        while (context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED) == null
+                || context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size() < 3) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                // ignore
+            }
+        }
         TestCase.assertEquals(3, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
 
         final MappingConfigAmendment mca1 = new MappingConfigAmendment();

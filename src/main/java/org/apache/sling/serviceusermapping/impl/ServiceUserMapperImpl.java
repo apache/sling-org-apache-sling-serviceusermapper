@@ -91,39 +91,44 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     /** default log */
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private Mapping[] globalServiceUserMappings = new Mapping[0];
+    private final BundleContext bundleContext;
 
-    private String defaultUser;
-
-    volatile boolean useDefaultMapping;
-
-    private Map<Long, MappingConfigAmendment> amendments = new HashMap<>();
-
-    private Mapping[] activeMappings = new Mapping[0];
+    private final ExecutorService executorService;
 
     private final List<ServiceUserValidator> userValidators = new CopyOnWriteArrayList<>();
 
     private final List<ServicePrincipalsValidator> principalsValidators = new CopyOnWriteArrayList<>();
 
-    private SortedMap<Mapping, Registration> activeRegistrations = new TreeMap<>();
+    private final AtomicReference<ServiceRegistration> defaultRegistration = new AtomicReference<>();
 
-    private BundleContext bundleContext;
+    private final Map<Long, MappingConfigAmendment> amendments = new HashMap<>();
 
-    private ExecutorService executorService;
+    private volatile Mapping[] globalServiceUserMappings;
 
-    boolean registerAsync = true;
+    private volatile String defaultUser;
+
+    private volatile boolean useDefaultMapping;
+
+    private volatile Mapping[] activeMappings = new Mapping[0];
+
+    private volatile SortedMap<Mapping, Registration> activeRegistrations = new TreeMap<>();
 
     private volatile boolean requireValidation = false;
 
-    private final AtomicReference<ServiceRegistration> defaultRegistration = new AtomicReference<>();
-
     @Activate
-    @Modified
-    synchronized void configure(BundleContext bundleContext, final Config config) {
-        if (registerAsync && executorService == null) {
-            executorService = Executors.newSingleThreadExecutor();
-        }
+    public ServiceUserMapperImpl(final BundleContext bundleContext, final Config config) {
+        this(bundleContext, config, Executors.newSingleThreadExecutor());
+    }
 
+    public ServiceUserMapperImpl(final BundleContext bundleContext, final Config config,
+            final ExecutorService executor) {
+        this.bundleContext = bundleContext;
+        this.executorService = executor;
+        this.configure(config);
+    }
+
+    @Modified
+    synchronized void configure(final Config config) {
         final String[] props = config.user_mapping();
 
         if ( props != null ) {
@@ -144,11 +149,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             this.globalServiceUserMappings = new Mapping[0];
         }
         this.defaultUser = config.user_default();
+        if (this.defaultUser != null && this.defaultUser.isEmpty()) {
+            this.defaultUser = null;
+        }
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
         RegistrationSet registrationSet = null;
-        this.bundleContext = bundleContext;
         registrationSet = this.updateMappings();
 
         this.executeServiceRegistrationsAsync(registrationSet);
@@ -159,11 +166,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         // this call does not unregister the mappings, but they should be unbound
         // through the unbind methods anyway
         updateServiceRegistrations(new Mapping[0]);
-        bundleContext = null;
-        if (executorService != null) {
-            executorService.shutdown();
-            executorService = null;
-        }
+        executorService.shutdown();
     }
 
     private void restartAllActiveServiceUserMappedServices() {
@@ -319,10 +322,6 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     RegistrationSet updateServiceRegistrations(final Mapping[] newMappings) {
 
         RegistrationSet result = new RegistrationSet();
-        // do not do anything if not activated
-        if (bundleContext == null) {
-            return result;
-        }
 
         final SortedSet<Mapping> orderedNewMappings = new TreeSet<>(Arrays.asList(newMappings));
         final SortedMap<Mapping, Registration> newRegistrations = new TreeMap<>();
@@ -358,23 +357,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     }
 
     private void executeServiceRegistrationsAsync(final RegistrationSet registrationSet) {
-
-        if (executorService == null) {
-            executeServiceRegistrations(registrationSet);
-        } else {
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    executeServiceRegistrations(registrationSet);
-                }
-            });
-        }
+        executorService.submit(() -> executeServiceRegistrations(registrationSet));
     }
 
 
     private void executeServiceRegistrations(final RegistrationSet registrationSet) {
 
-            ServiceRegistration reg = defaultRegistration.getAndSet(null);
+        ServiceRegistration reg = defaultRegistration.getAndSet(null);
         if (reg != null) {
             reg.unregister();
         }
@@ -397,12 +386,6 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             }
         }
 
-        BundleContext savedBundleContext = bundleContext;
-
-        if (savedBundleContext == null) {
-            return;
-        }
-
         for (final Registration registration : registrationSet.added) {
             Mapping mapping = registration.mapping;
             final Dictionary<String, Object> properties = new Hashtable<>();
@@ -411,7 +394,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             }
 
             properties.put(Mapping.SERVICENAME, mapping.getServiceName());
-            final ServiceRegistration serviceRegistration = savedBundleContext.registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
+            final ServiceRegistration serviceRegistration = bundleContext.registerService(
+                    ServiceUserMappedImpl.SERVICEUSERMAPPED,
                     new ServiceUserMappedImpl(), properties);
 
             ServiceRegistration oldServiceRegistration = registration.setService(serviceRegistration);
@@ -426,10 +410,11 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             }
         }
 
-        if (this.useDefaultMapping || (defaultUser != null && !defaultUser.isEmpty())) {
+        if (this.useDefaultMapping || defaultUser != null) {
             Dictionary<String, Object> properties = new Hashtable<>();
-            properties.put(Mapping.SERVICENAME, getServiceName(savedBundleContext.getBundle()));
-            final ServiceRegistration serviceRegistration = savedBundleContext.registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
+            properties.put(Mapping.SERVICENAME, getServiceName(bundleContext.getBundle()));
+            final ServiceRegistration serviceRegistration = bundleContext
+                    .registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
                 new ServiceUserMappedImpl(), properties);
             ServiceRegistration oldServiceRegistration = this.defaultRegistration.getAndSet(serviceRegistration);
             if (oldServiceRegistration != null) {
@@ -465,7 +450,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         }
 
         // use default mapping if configured and no default user
-        if ( this.useDefaultMapping && (this.defaultUser == null || this.defaultUser.isEmpty() )) {
+        if (this.useDefaultMapping && this.defaultUser == null) {
             final String userName = "serviceuser--" + serviceName + (subServiceName == null ? "" : "--" + subServiceName);
             log.debug("internalGetUserId: no mapping found, using default mapping [{}]", userName);
             return userName;
@@ -549,6 +534,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return bundle.getSymbolicName();
     }
 
+    @Override
     public List<Mapping> getActiveMappings() {
         return Collections.unmodifiableList(Arrays.asList(activeMappings));
     }
