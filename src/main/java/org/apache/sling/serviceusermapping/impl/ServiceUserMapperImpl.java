@@ -487,7 +487,15 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             return false;
         }
         List<ServiceUserValidator> validators = getUserValidators();
-        if (!validators.isEmpty()) {
+        if (validators.isEmpty()) {
+            if (require) {
+                log.debug("isValidUser: No active validators for userId [{}] and require -> invalid", userId);
+                return false;
+            } else {
+                log.debug("isValidUser: No active validators for userId [{}] -> valid", userId);
+                return true;
+            }
+        } else {
             for (final ServiceUserValidator validator : validators) {
                 if (!validator.isValid(userId, serviceName, subServiceName)) {
                     log.debug("isValidUser: Validator {} doesn't accept userId [{}] -> invalid", validator, userId);
@@ -495,10 +503,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
                 }
             }
             log.debug("isValidUser: All validators accepted userId [{}] -> valid", userId);
-        } else {
-            log.debug("isValidUser: No active validators for userId [{}] -> valid", userId);
+            return true;
         }
-        return !require || !validators.isEmpty();
     }
 
     private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
@@ -507,7 +513,15 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             return false;
         }
         List<ServicePrincipalsValidator> validators = getPrincipalsValidators();
-        if (!validators.isEmpty() || require) {
+        if (validators.isEmpty()) {
+            if (require) {
+                log.debug("areValidPrincipals: No active validators for principal names [{}] and require -> invalid", principalNames);
+                return false;
+            } else {
+                log.debug("areValidPrincipals: No active validators for principal names [{}] -> valid", principalNames);
+                return true;
+            }
+        } else {
             for (final ServicePrincipalsValidator validator : validators) {
                 if (!validator.isValid(principalNames, serviceName, subServiceName)) {
                     log.debug("areValidPrincipals: Validator {} doesn't accept principal names [{}] -> invalid", validator, principalNames);
@@ -515,10 +529,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
                 }
             }
             log.debug("areValidPrincipals: All validators accepted principal names [{}] -> valid", principalNames);
-        } else {
-            log.debug("areValidPrincipals: No active validators for principal names [{}] -> valid", principalNames);
+            return true;
         }
-        return !require || !validators.isEmpty();
     }
 
     private List<ServiceUserValidator> getUserValidators() {
