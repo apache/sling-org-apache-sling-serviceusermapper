@@ -361,12 +361,12 @@ public class ServiceUserMapperImplTest {
         ServicePrincipalsValidator sampleInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
             return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
         };
-        sum.bindServicePrincipalsValidator(sampleInvalid);
+        sum.bindServicePrincipalsValidator(sampleInvalid, Collections.emptyMap());
 
         ServicePrincipalsValidator anotherInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
             return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(ANOTHER::equals);
         };
-        sum.bindServicePrincipalsValidator(anotherInvalid);
+        sum.bindServicePrincipalsValidator(anotherInvalid, Collections.emptyMap());
 
         assertEquals(new LinkedHashSet<>(Collections.singleton("validPrincipal")), sum.getServicePrincipalNames(BUNDLE1, null));
         assertEquals(new LinkedHashSet<>(Arrays.asList("validPrincipal", SAMPLE_SUB)), sum.getServicePrincipalNames(BUNDLE1, SUB));
