@@ -184,7 +184,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         executorService.shutdown();
     }
 
-    private void restartAllActiveServiceUserMappedServices() {
+    void restartAllActiveServiceUserMappedServices() {
         RegistrationSet registrationSet = new RegistrationSet();
         registrationSet.removed = activeRegistrations.values();
         registrationSet.added = activeRegistrations.values();
@@ -482,7 +482,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return this.defaultUser;
     }
 
-    private boolean isValidUser(final String userId, final String serviceName, final String subServiceName, boolean require) {
+    boolean isValidUser(final String userId, final String serviceName, final String subServiceName, boolean require) {
         if (userId == null) {
             log.debug("isValidUser: userId is null -> invalid");
             return false;
@@ -508,7 +508,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         }
     }
 
-    private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
+    boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
         if (principalNames == null) {
             log.debug("areValidPrincipals: principalNames are null -> invalid");
             return false;

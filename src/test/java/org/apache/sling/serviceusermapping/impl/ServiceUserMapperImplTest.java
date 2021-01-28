@@ -20,7 +20,7 @@ package org.apache.sling.serviceusermapping.impl;
 
 import static junit.framework.TestCase.assertFalse;
 import static junit.framework.TestCase.assertNull;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -31,7 +31,6 @@ import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +38,7 @@ import java.util.concurrent.Future;
 import java.util.stream.StreamSupport;
 
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
+import org.apache.sling.serviceusermapping.ServiceUserMapper;
 import org.apache.sling.serviceusermapping.ServiceUserValidator;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -99,6 +99,62 @@ public class ServiceUserMapperImplTest {
 
         BUNDLE5 = mock(Bundle.class);
         when(BUNDLE5.getSymbolicName()).thenReturn(BUNDLE_SYMBOLIC5);
+    }
+
+    @Test
+    public void test_requiredValidators() {
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.require_validation()).thenReturn(true);
+        when(config.required_validators()).thenReturn(new String[] {"bla","bli","blub"});
+
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(null, config) {
+            @Override
+            void restartAllActiveServiceUserMappedServices() {
+                throw new IllegalStateException();
+            }
+        };
+        ServiceUserValidator userValidator = mock(ServiceUserValidator.class);
+        ServicePrincipalsValidator principalsValidator1 = mock(ServicePrincipalsValidator.class);
+        ServicePrincipalsValidator principalsValidator2 = mock(ServicePrincipalsValidator.class);
+
+        assertTrue(mapper.isValidUser("org", "foo", "bar", false));
+        assertFalse(mapper.isValidUser("org", "foo", "bar", true));
+
+        assertTrue(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", false));
+        assertFalse(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", true));
+
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(ServiceUserMapper.VALIDATOR_ID, "bla");
+        mapper.bindServiceUserValidator(userValidator, properties);
+
+        assertTrue(mapper.isValidUser("org", "foo", "bar", false));
+        assertFalse(mapper.isValidUser("org", "foo", "bar", true));
+
+        assertTrue(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", false));
+        assertFalse(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", true));
+
+        properties.put(ServiceUserMapper.VALIDATOR_ID, "bli");
+        mapper.bindServicePrincipalsValidator(principalsValidator2, properties);
+
+        assertTrue(mapper.isValidUser("org", "foo", "bar", false));
+        assertFalse(mapper.isValidUser("org", "foo", "bar", true));
+
+        assertTrue(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", false));
+        assertFalse(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", true));
+
+        properties.put(ServiceUserMapper.VALIDATOR_ID, "blub");
+        try {
+            mapper.bindServicePrincipalsValidator(principalsValidator1, properties);
+            fail();
+        } catch (IllegalStateException e) {
+            // Expected;
+        }
+
+        assertFalse(mapper.isValidUser("org", "foo", "bar", false));
+        assertFalse(mapper.isValidUser("org", "foo", "bar", true));
+
+        assertFalse(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", false));
+        assertFalse(mapper.areValidPrincipals(Arrays.asList("baz"), "org", "foo", true));
     }
 
     @Test
