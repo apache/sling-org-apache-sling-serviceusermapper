@@ -88,11 +88,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         boolean user_enable_default_mapping() default true;
 
         @AttributeDefinition(name = "Require Validation",
-                description = "Do validators have to be present and validate the service users?")
+                description = "If true, a service user is only valid if there are present validators that accept it.")
         boolean require_validation() default false;
 
         @AttributeDefinition(name = "Required Validators",
-                description = "A list of required validators ids. If not present and require validation is on not user will be valid")
+                description = "A list of required validators ids. If any configured validator in this list is not present " +
+                        "and \"require validation\" is enabled no userid and no principal name will be valid.")
         String[] required_validators() default {};
     }
 
@@ -489,20 +490,20 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         List<ServiceUserValidator> validators = getUserValidators();
         if (validators.isEmpty()) {
             if (require) {
-                log.debug("isValidUser: No active validators for userId [{}] and require -> invalid", userId);
+                log.debug("isValidUser: No active validators for userId '{}' and require -> invalid", userId);
                 return false;
             } else {
-                log.debug("isValidUser: No active validators for userId [{}] -> valid", userId);
+                log.debug("isValidUser: No active validators for userId '{}' -> valid", userId);
                 return true;
             }
         } else {
             for (final ServiceUserValidator validator : validators) {
                 if (!validator.isValid(userId, serviceName, subServiceName)) {
-                    log.debug("isValidUser: Validator {} doesn't accept userId [{}] -> invalid", validator, userId);
+                    log.debug("isValidUser: Validator {} doesn't accept userId '{}' -> invalid", validator, userId);
                     return false;
                 }
             }
-            log.debug("isValidUser: All validators accepted userId [{}] -> valid", userId);
+            log.debug("isValidUser: All validators accepted userId '{}' -> valid", userId);
             return true;
         }
     }
@@ -534,16 +535,16 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     }
 
     private List<ServiceUserValidator> getUserValidators() {
-        if (presentValidators.containsAll(requiredValidators)) {
-            return userValidators;
-        } else {
-            return Collections.emptyList();
-        }
+        return getValidatorsIfPresent(userValidators);
     }
 
     private List<ServicePrincipalsValidator> getPrincipalsValidators() {
+        return getValidatorsIfPresent(principalsValidators);
+    }
+
+    private <T> List<T> getValidatorsIfPresent(List<T> validators) {
         if (presentValidators.containsAll(requiredValidators)) {
-            return principalsValidators;
+            return validators;
         } else {
             return Collections.emptyList();
         }
