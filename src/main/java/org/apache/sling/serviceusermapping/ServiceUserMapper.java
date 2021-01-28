@@ -58,6 +58,10 @@ import org.osgi.framework.Bundle;
  */
 @ProviderType
 public interface ServiceUserMapper {
+	/**
+	 * Property to add as a unique id to a service registration.
+	 */
+	String VALIDATOR_ID = "validator.id";
 
 	/**
 	 * Returns the ID of a user to access the data store on behalf of the
