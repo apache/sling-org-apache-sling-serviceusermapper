@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.stream.StreamSupport;
 
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
 import org.apache.sling.serviceusermapping.ServiceUserValidator;
@@ -205,6 +206,33 @@ public class ServiceUserMapperImplTest {
     }
 
     @Test
+    public void test_getServiceUserID_WithMultipleValidators() {
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.user_mapping()).thenReturn(new String[] {
+                BUNDLE_SYMBOLIC1 + "=" + SAMPLE, //
+                BUNDLE_SYMBOLIC2 + "=" + ANOTHER, //
+                BUNDLE_SYMBOLIC1 + ":" + SUB + "=" + SAMPLE_SUB, //
+                BUNDLE_SYMBOLIC2 + ":" + SUB + "=" + ANOTHER_SUB //
+        });
+        when(config.user_default()).thenReturn(NONE);
+        when(config.user_enable_default_mapping()).thenReturn(false);
+
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
+        ServiceUserValidator sampleInvalid = (serviceUserId, serviceName, subServiceName) -> !SAMPLE.equals(serviceUserId);
+        sum.bindServiceUserValidator(sampleInvalid);
+
+        ServiceUserValidator anotherInvalid = (serviceUserId, serviceName, subServiceName) -> !ANOTHER.equals(serviceUserId);
+        sum.bindServiceUserValidator(anotherInvalid);
+
+        assertNull(sum.getServiceUserID(BUNDLE1, null));
+        assertNull(sum.getServiceUserID(BUNDLE2, null));
+        assertNull(sum.getServiceUserID(BUNDLE1, ""));
+        assertNull(sum.getServiceUserID(BUNDLE2, ""));
+        assertEquals(SAMPLE_SUB, sum.getServiceUserID(BUNDLE1, SUB));
+        assertEquals(ANOTHER_SUB, sum.getServiceUserID(BUNDLE2, SUB));
+    }
+
+    @Test
     public void test_getServicePrincipalNames() {
         ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
         when(config.user_mapping()).thenReturn(new String[] {
@@ -281,18 +309,37 @@ public class ServiceUserMapperImplTest {
         });
 
         final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
-        ServicePrincipalsValidator validator = new ServicePrincipalsValidator() {
-            @Override
-            public boolean isValid(Iterable<String> servicePrincipalNames, String serviceName, String subServiceName) {
-                for (String pName : servicePrincipalNames) {
-                    if (SAMPLE.equals(pName)) {
-                        return false;
-                    }
-                }
-                return true;
-            }
+        ServicePrincipalsValidator validator = (servicePrincipalNames, serviceName, subServiceName) -> {
+            return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
         };
         sum.bindServicePrincipalsValidator(validator);
+
+        assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
+        assertNull(sum.getServicePrincipalNames(BUNDLE2, null));
+        assertNull(sum.getServicePrincipalNames(BUNDLE1, SUB));
+        assertNull(sum.getServicePrincipalNames(BUNDLE2, SUB));
+    }
+
+    @Test
+    public void test_getServicePrincipalnames_WithMultipleValidators() {
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.user_mapping()).thenReturn(new String[] {
+                BUNDLE_SYMBOLIC1 + "=[" + SAMPLE + "]", //
+                BUNDLE_SYMBOLIC2 + "=[" + ANOTHER + "," + SAMPLE + "]", //
+                BUNDLE_SYMBOLIC1 + ":" + SUB + "=[validPrincipal," + SAMPLE + "]", //
+                BUNDLE_SYMBOLIC2 + ":" + SUB + "=[validPrincipal," + SAMPLE_SUB + "," + ANOTHER + "]"//
+        });
+
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
+        ServicePrincipalsValidator sampleInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
+            return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
+        };
+        sum.bindServicePrincipalsValidator(sampleInvalid);
+
+        ServicePrincipalsValidator anotherInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
+            return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(ANOTHER::equals);
+        };
+        sum.bindServicePrincipalsValidator(anotherInvalid);
 
         assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
         assertNull(sum.getServicePrincipalNames(BUNDLE2, null));
