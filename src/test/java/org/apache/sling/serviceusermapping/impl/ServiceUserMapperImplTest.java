@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -195,7 +196,7 @@ public class ServiceUserMapperImplTest {
                 return true;
             }
         };
-        sum.bindServiceUserValidator(serviceUserValidator);
+        sum.bindServiceUserValidator(serviceUserValidator, Collections.emptyMap());
 
         TestCase.assertEquals(null, sum.getServiceUserID(BUNDLE1, null));
         TestCase.assertEquals(ANOTHER, sum.getServiceUserID(BUNDLE2, null));
@@ -219,10 +220,10 @@ public class ServiceUserMapperImplTest {
 
         final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
         ServiceUserValidator sampleInvalid = (serviceUserId, serviceName, subServiceName) -> !SAMPLE.equals(serviceUserId);
-        sum.bindServiceUserValidator(sampleInvalid);
+        sum.bindServiceUserValidator(sampleInvalid, Collections.emptyMap());
 
         ServiceUserValidator anotherInvalid = (serviceUserId, serviceName, subServiceName) -> !ANOTHER.equals(serviceUserId);
-        sum.bindServiceUserValidator(anotherInvalid);
+        sum.bindServiceUserValidator(anotherInvalid, Collections.emptyMap());
 
         assertNull(sum.getServiceUserID(BUNDLE1, null));
         assertNull(sum.getServiceUserID(BUNDLE2, null));
@@ -312,7 +313,7 @@ public class ServiceUserMapperImplTest {
         ServicePrincipalsValidator validator = (servicePrincipalNames, serviceName, subServiceName) -> {
             return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
         };
-        sum.bindServicePrincipalsValidator(validator);
+        sum.bindServicePrincipalsValidator(validator, Collections.emptyMap());
 
         assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
         assertNull(sum.getServicePrincipalNames(BUNDLE2, null));
@@ -334,12 +335,12 @@ public class ServiceUserMapperImplTest {
         ServicePrincipalsValidator sampleInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
             return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
         };
-        sum.bindServicePrincipalsValidator(sampleInvalid);
+        sum.bindServicePrincipalsValidator(sampleInvalid, Collections.emptyMap());
 
         ServicePrincipalsValidator anotherInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
             return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(ANOTHER::equals);
         };
-        sum.bindServicePrincipalsValidator(anotherInvalid);
+        sum.bindServicePrincipalsValidator(anotherInvalid, Collections.emptyMap());
 
         assertNull(sum.getServicePrincipalNames(BUNDLE1, null));
         assertNull(sum.getServicePrincipalNames(BUNDLE2, null));

@@ -18,19 +18,7 @@
  */
 package org.apache.sling.serviceusermapping.impl;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Dictionary;
-import java.util.HashMap;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.SortedSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -85,7 +73,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
                      "default mapping is applied which uses the service user \"serviceuser--\" + bundleId + [\"--\" + subServiceName]")
         boolean user_enable_default_mapping() default true;
 
+        @AttributeDefinition(name = "Require Validation",
+                description = "Do validators have to be present and validate the service users?")
         boolean require_validation() default false;
+
+        @AttributeDefinition(name = "Required Validators",
+                description = "A list of required validators ids. If not present and require validation is on not user will be valid")
+        String[] required_validators() default {};
     }
 
     /** default log */
@@ -114,6 +108,10 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     private volatile SortedMap<Mapping, Registration> activeRegistrations = new TreeMap<>();
 
     private volatile boolean requireValidation = false;
+
+    private final Set<String> requiredValidators = new HashSet<>();
+
+    private final List<String> presentValidators = new CopyOnWriteArrayList<>();
 
     @Activate
     public ServiceUserMapperImpl(final BundleContext bundleContext, final Config config) {
@@ -155,6 +153,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
+        if (config.required_validators() != null) {
+            requiredValidators.addAll(Arrays.asList(config.required_validators()));
+        }
         RegistrationSet registrationSet = this.updateMappings();
 
         this.executeServiceRegistrationsAsync(registrationSet);
@@ -180,9 +181,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * @param serviceUserValidator
      */
     @Reference(cardinality=ReferenceCardinality.MULTIPLE, policy= ReferencePolicy.DYNAMIC)
-    protected synchronized void bindServiceUserValidator(final ServiceUserValidator serviceUserValidator) {
+    protected synchronized void bindServiceUserValidator(final ServiceUserValidator serviceUserValidator, final Map<String, ?> props) {
         userValidators.add(serviceUserValidator);
-        if (!requireValidation || !principalsValidators.isEmpty()) {
+        Object id = props.get(VALIDATOR_ID);
+        if (id instanceof String) {
+            presentValidators.add((String) id);
+        }
+        if (!requireValidation || !getPrincipalsValidators().isEmpty()) {
             restartAllActiveServiceUserMappedServices();
         }
     }
@@ -191,8 +196,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * unbind the serviceUserValidator
      * @param serviceUserValidator
      */
-    protected synchronized void unbindServiceUserValidator(final ServiceUserValidator serviceUserValidator) {
+    protected synchronized void unbindServiceUserValidator(final ServiceUserValidator serviceUserValidator, final Map<String, ?> props) {
         userValidators.remove(serviceUserValidator);
+        Object id = props.get(VALIDATOR_ID);
+        if (id instanceof String) {
+            presentValidators.remove(id);
+        }
         restartAllActiveServiceUserMappedServices();
     }
 
@@ -201,9 +210,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * @param servicePrincipalsValidator
      */
     @Reference(cardinality=ReferenceCardinality.MULTIPLE, policy= ReferencePolicy.DYNAMIC)
-    protected synchronized void bindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator) {
+    protected synchronized void bindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator, final Map<String, ?> props) {
         principalsValidators.add(servicePrincipalsValidator);
-        if (!requireValidation || !userValidators.isEmpty()) {
+        Object id = props.get(VALIDATOR_ID);
+        if (id instanceof String) {
+            presentValidators.add((String) id);
+        }
+        if (!requireValidation || !getUserValidators().isEmpty()) {
             restartAllActiveServiceUserMappedServices();
         }
     }
@@ -212,8 +225,12 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * unbind the servicePrincipalsValidator
      * @param servicePrincipalsValidator
      */
-    protected synchronized void unbindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator) {
+    protected synchronized void unbindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator, final Map<String, ?> props) {
         principalsValidators.remove(servicePrincipalsValidator);
+        Object id = props.get(VALIDATOR_ID);
+        if (id instanceof String) {
+            presentValidators.remove(id);
+        }
         restartAllActiveServiceUserMappedServices();
     }
 
@@ -455,19 +472,19 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             log.debug("isValidUser: userId is null -> invalid");
             return false;
         }
-        if ( !userValidators.isEmpty()  || require) {
-            for (final ServiceUserValidator validator : userValidators) {
-                if ( validator.isValid(userId, serviceName, subServiceName) ) {
-                    log.debug("isValidUser: Validator {} accepts userId [{}] -> valid", validator, userId);
-                    return true;
+        List<ServiceUserValidator> validators = getUserValidators();
+        if (!validators.isEmpty()) {
+            for (final ServiceUserValidator validator : validators) {
+                if (!validator.isValid(userId, serviceName, subServiceName)) {
+                    log.debug("isValidUser: Validator {} doesn't accept userId [{}] -> invalid", validator, userId);
+                    return false;
                 }
             }
-            log.debug("isValidUser: No validator accepted userId [{}] -> invalid", userId);
-            return false;
+            log.debug("isValidUser: All validators accepted userId [{}] -> valid", userId);
         } else {
             log.debug("isValidUser: No active validators for userId [{}] -> valid", userId);
-            return true;
         }
+        return require ? !validators.isEmpty() : true;
     }
 
     private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
@@ -475,18 +492,34 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             log.debug("areValidPrincipals: principalNames are null -> invalid");
             return false;
         }
-        if ( !principalsValidators.isEmpty() || require ) {
-            for (final ServicePrincipalsValidator validator : principalsValidators) {
-                if ( validator.isValid(principalNames, serviceName, subServiceName) ) {
-                    log.debug("areValidPrincipals: Validator {} accepts principal names [{}] -> valid", validator, principalNames);
-                    return true;
+        List<ServicePrincipalsValidator> validators = getPrincipalsValidators();
+        if (!validators.isEmpty() || require) {
+            for (final ServicePrincipalsValidator validator : validators) {
+                if (!validator.isValid(principalNames, serviceName, subServiceName)) {
+                    log.debug("areValidPrincipals: Validator {} doesn't accept principal names [{}] -> invalid", validator, principalNames);
+                    return false;
                 }
             }
-            log.debug("areValidPrincipals: No validator accepted principal names [{}] -> invalid", principalNames);
-            return false;
+            log.debug("areValidPrincipals: All validators accepted principal names [{}] -> valid", principalNames);
         } else {
             log.debug("areValidPrincipals: No active validators for principal names [{}] -> valid", principalNames);
-            return true;
+        }
+        return require ? !validators.isEmpty() : true;
+    }
+
+    private List<ServiceUserValidator> getUserValidators() {
+        if (presentValidators.containsAll(requiredValidators)) {
+            return userValidators;
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    private List<ServicePrincipalsValidator> getPrincipalsValidators() {
+        if (presentValidators.containsAll(requiredValidators)) {
+            return principalsValidators;
+        } else {
+            return Collections.emptyList();
         }
     }
 
