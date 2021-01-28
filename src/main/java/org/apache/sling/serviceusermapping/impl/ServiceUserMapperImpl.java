@@ -498,7 +498,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         } else {
             log.debug("isValidUser: No active validators for userId [{}] -> valid", userId);
         }
-        return require ? !validators.isEmpty() : true;
+        return !require || !validators.isEmpty();
     }
 
     private boolean areValidPrincipals(final Iterable<String> principalNames, final String serviceName, final String subServiceName, boolean require) {
@@ -518,7 +518,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         } else {
             log.debug("areValidPrincipals: No active validators for principal names [{}] -> valid", principalNames);
         }
-        return require ? !validators.isEmpty() : true;
+        return !require || !validators.isEmpty();
     }
 
     private List<ServiceUserValidator> getUserValidators() {
