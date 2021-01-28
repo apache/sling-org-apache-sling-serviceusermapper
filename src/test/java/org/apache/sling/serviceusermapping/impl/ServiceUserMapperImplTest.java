@@ -26,10 +26,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -345,6 +347,29 @@ public class ServiceUserMapperImplTest {
         assertNull(sum.getServicePrincipalNames(BUNDLE2, null));
         assertNull(sum.getServicePrincipalNames(BUNDLE1, SUB));
         assertNull(sum.getServicePrincipalNames(BUNDLE2, SUB));
+    }
+
+    @Test
+    public void test_getServicePrincipalnames_WithMultipleValidators_Valid() {
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.user_mapping()).thenReturn(new String[] {
+                BUNDLE_SYMBOLIC1 + "=[validPrincipal]", //
+                BUNDLE_SYMBOLIC1 + ":" + SUB + "=[validPrincipal," + SAMPLE_SUB + "]"//
+        });
+
+        final ServiceUserMapperImpl sum = new ServiceUserMapperImpl(null, config);
+        ServicePrincipalsValidator sampleInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
+            return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(SAMPLE::equals);
+        };
+        sum.bindServicePrincipalsValidator(sampleInvalid);
+
+        ServicePrincipalsValidator anotherInvalid = (servicePrincipalNames, serviceName, subServiceName) -> {
+            return StreamSupport.stream(servicePrincipalNames.spliterator(), false).noneMatch(ANOTHER::equals);
+        };
+        sum.bindServicePrincipalsValidator(anotherInvalid);
+
+        assertEquals(new LinkedHashSet<>(Collections.singleton("validPrincipal")), sum.getServicePrincipalNames(BUNDLE1, null));
+        assertEquals(new LinkedHashSet<>(Arrays.asList("validPrincipal", SAMPLE_SUB)), sum.getServicePrincipalNames(BUNDLE1, SUB));
     }
 
     private static void assertEqualPrincipalNames(Iterable<String> result, String... expected) {
