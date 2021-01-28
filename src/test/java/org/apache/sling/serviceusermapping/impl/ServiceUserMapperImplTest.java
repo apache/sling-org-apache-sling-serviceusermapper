@@ -368,8 +368,8 @@ public class ServiceUserMapperImplTest {
         };
         sum.bindServicePrincipalsValidator(anotherInvalid, Collections.emptyMap());
 
-        assertEquals(new LinkedHashSet<>(Collections.singleton("validPrincipal")), sum.getServicePrincipalNames(BUNDLE1, null));
-        assertEquals(new LinkedHashSet<>(Arrays.asList("validPrincipal", SAMPLE_SUB)), sum.getServicePrincipalNames(BUNDLE1, SUB));
+        assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE1, null), "validPrincipal");
+        assertEqualPrincipalNames(sum.getServicePrincipalNames(BUNDLE1, SUB), "validPrincipal", SAMPLE_SUB);
     }
 
     private static void assertEqualPrincipalNames(Iterable<String> result, String... expected) {
