@@ -45,6 +45,6 @@ public interface ServiceUserMapped {
     /**
      * The name of the osgi property holding the sub service name.
      */
-    static String SUBSERVICENAME = "subServiceName";
+    String SUBSERVICENAME = "subServiceName";
 
 }
