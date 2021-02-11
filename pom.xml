@@ -79,8 +79,8 @@
                             <shadeSourcesContent>true</shadeSourcesContent>
                             <relocations>
                                 <relocation>
-                                    <pattern>org.apache.felix</pattern>
-                                    <shadedPattern>org.apache.sling.serviceusermapping.impl.felix</shadedPattern>
+                                    <pattern>org.apache.felix.utils</pattern>
+                                    <shadedPattern>org.apache.sling.serviceusermapping.impl.felix.utils</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
