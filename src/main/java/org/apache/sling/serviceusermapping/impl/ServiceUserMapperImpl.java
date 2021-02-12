@@ -91,10 +91,15 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
                 description = "If true, a service user is only valid if there are present validators that accept it.")
         boolean require_validation() default false;
 
-        @AttributeDefinition(name = "Required Validators",
-                description = "A list of required validators ids. If any configured validator in this list is not present " +
+        @AttributeDefinition(name = "Required User Validators",
+                description = "A list of required user validators ids. If any configured validator in this list is not present " +
                         "and \"require validation\" is enabled no userid and no principal name will be valid.")
-        String[] required_validators() default {};
+        String[] required_user_validators() default {};
+
+        @AttributeDefinition(name = "Required Principal Validators",
+                description = "A list of required principal validators ids. If any configured validator in this list is not present " +
+                        "and \"require validation\" is enabled no userid and no principal name will be valid.")
+        String[] required_principal_validators() default {};
     }
 
     /** default log */
@@ -124,9 +129,13 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private volatile boolean requireValidation = false;
 
-    private final Set<String> requiredValidators = new HashSet<>();
+    private final Set<String> requiredUserValidators = new HashSet<>();
 
-    private final List<String> presentValidators = new CopyOnWriteArrayList<>();
+    private final Set<String> requiredPrincipalValidators = new HashSet<>();
+
+    private final List<String> presentUserValidators = new CopyOnWriteArrayList<>();
+
+    private final List<String> presentPrincipalValidators = new CopyOnWriteArrayList<>();
 
     @Activate
     public ServiceUserMapperImpl(final BundleContext bundleContext, final Config config) {
@@ -168,9 +177,14 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
-        if (config.required_validators() != null) {
-            requiredValidators.addAll(Arrays.asList(config.required_validators()));
+        if (config.required_user_validators() != null) {
+            requiredUserValidators.addAll(Arrays.asList(config.required_user_validators()));
         }
+
+        if (config.required_principal_validators() != null) {
+            requiredPrincipalValidators.addAll(Arrays.asList(config.required_principal_validators()));
+        }
+
         RegistrationSet registrationSet = this.updateMappings();
 
         this.executeServiceRegistrationsAsync(registrationSet);
@@ -200,8 +214,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         userValidators.add(serviceUserValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
-            presentValidators.add((String) id);
+            presentUserValidators.add((String) id);
         }
+
         if (!requireValidation || !getPrincipalsValidators().isEmpty()) {
             restartAllActiveServiceUserMappedServices();
         }
@@ -215,8 +230,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         userValidators.remove(serviceUserValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
-            presentValidators.remove(id);
+            presentUserValidators.remove(id);
         }
+
         restartAllActiveServiceUserMappedServices();
     }
 
@@ -229,8 +245,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         principalsValidators.add(servicePrincipalsValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
-            presentValidators.add((String) id);
+            presentPrincipalValidators.add((String) id);
         }
+
         if (!requireValidation || !getUserValidators().isEmpty()) {
             restartAllActiveServiceUserMappedServices();
         }
@@ -244,7 +261,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         principalsValidators.remove(servicePrincipalsValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
-            presentValidators.remove(id);
+            presentPrincipalValidators.remove(id);
         }
         restartAllActiveServiceUserMappedServices();
     }
@@ -543,7 +560,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     }
 
     private <T> List<T> getValidatorsIfPresent(List<T> validators) {
-        if (presentValidators.containsAll(requiredValidators)) {
+        if (presentUserValidators.containsAll(requiredUserValidators) && presentPrincipalValidators.containsAll(requiredPrincipalValidators)) {
             return validators;
         } else {
             return Collections.emptyList();

@@ -103,7 +103,8 @@ public class ServiceUserMapperImplTest {
     public void test_requiredValidators() {
         ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
         when(config.require_validation()).thenReturn(true);
-        when(config.required_validators()).thenReturn(new String[] {"bla","bli","blub"});
+        when(config.required_user_validators()).thenReturn(new String[] {"bla"});
+        when(config.required_principal_validators()).thenReturn(new String[] {"bli","blub"});
 
         final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(null, config) {
             @Override
@@ -413,7 +414,7 @@ public class ServiceUserMapperImplTest {
                 BUNDLE_SYMBOLIC1 + "=["+SAMPLE+"]", //
                 BUNDLE_SYMBOLIC1 + ":" + SUB + "=["+SAMPLE+"," + SAMPLE_SUB + "]"//
         });
-        when(config.required_validators()).thenReturn(new String[]{"requiredId_1", "requiredId_2"});
+        when(config.required_user_validators()).thenReturn(new String[]{"requiredId_1", "requiredId_2"});
         when(config.require_validation()).thenReturn(false);
 
         ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(null, config);
@@ -430,7 +431,7 @@ public class ServiceUserMapperImplTest {
                 BUNDLE_SYMBOLIC1 + "=["+SAMPLE+"]", //
                 BUNDLE_SYMBOLIC1 + ":" + SUB + "=["+SAMPLE+"," + SAMPLE_SUB + "]"//
         });
-        when(config.required_validators()).thenReturn(new String[]{"requiredId_1", "requiredId_2"});
+        when(config.required_principal_validators()).thenReturn(new String[]{"requiredId_1", "requiredId_2"});
         when(config.require_validation()).thenReturn(true);
 
         ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(null, config);
