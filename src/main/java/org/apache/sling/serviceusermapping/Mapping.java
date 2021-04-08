@@ -41,6 +41,8 @@ public class Mapping implements Comparable<Mapping> {
 
     private final Set<String> principalNames;
 
+    private final String identity;
+
     /**
      * Creates a mapping entry for the entry specification of the form:
      *
@@ -70,9 +72,11 @@ public class Mapping implements Comparable<Mapping> {
         if (colon < 0 || colon > equals) {
             this.serviceName = spec.substring(0, equals);
             this.subServiceName = null;
+            this.identity = this.serviceName;
         } else {
             this.serviceName = spec.substring(0, colon);
             this.subServiceName = spec.substring(colon + 1, equals);
+            this.identity = this.serviceName + "-" + this.subServiceName;
         }
 
         String s = spec.substring(equals + 1);
@@ -162,27 +166,6 @@ public class Mapping implements Comparable<Mapping> {
         if (o == null) {
             return -1;
         }
-
-        int result = compare(this.serviceName, o.serviceName);
-        if (result == 0) {
-            result = compare(this.subServiceName, o.subServiceName);
-        }
-        return result;
-    }
-
-    private int compare(String str1, String str2) {
-        if (str1 == str2) {
-            return 0;
-        }
-
-        if (str1 == null) {
-            return -1;
-        }
-
-        if (str2 == null) {
-            return 1;
-        }
-
-        return str1.hashCode() - str2.hashCode();
+        return this.identity.compareTo(o.identity);
     }
 }
