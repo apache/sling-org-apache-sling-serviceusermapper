@@ -438,7 +438,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             properties.put(Mapping.SERVICENAME, mapping.getServiceName());
             final ServiceRegistration serviceRegistration = bundleContext.registerService(
                     ServiceUserMappedImpl.SERVICEUSERMAPPED,
-                    new ServiceUserMappedImpl(), properties);
+                    ServiceUserMappedImpl.SINGLETON, properties);
 
             ServiceRegistration oldServiceRegistration = registration.setService(serviceRegistration);
             log.debug("Activated ServiceUserMapped {}", registration.mapping);
@@ -457,7 +457,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
             properties.put(Mapping.SERVICENAME, getServiceName(bundleContext.getBundle()));
             final ServiceRegistration serviceRegistration = bundleContext
                     .registerService(ServiceUserMappedImpl.SERVICEUSERMAPPED,
-                new ServiceUserMappedImpl(), properties);
+                ServiceUserMappedImpl.SINGLETON, properties);
             this.defaultRegistration.set(serviceRegistration);
         }
     }

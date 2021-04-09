@@ -28,4 +28,9 @@ public class ServiceUserMappedImpl implements ServiceUserMapped {
 
     static String SERVICEUSERMAPPED = ServiceUserMapped.class.getName();
 
+    public static final ServiceUserMapped SINGLETON = new ServiceUserMappedImpl();
+
+    private ServiceUserMappedImpl() {
+        // private constructor
+    }
 }

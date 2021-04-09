@@ -28,11 +28,13 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -620,7 +622,7 @@ public class ServiceUserMapperImplTest {
 
         final BundleContext bundleContext = mock(BundleContext.class);
         final Bundle bundle = mock(Bundle.class);
-        final Map<String, Map<Object, Dictionary>> registrations = new HashMap<>();
+        final Map<String, List<Map.Entry<Object, Dictionary<String, Object>>>> registrations = new HashMap<>();
 
         public ServiceRegistrationContextHelper() {
             when(bundleContext.registerService(any(String.class), any(Object.class), any(Dictionary.class)))
@@ -633,15 +635,11 @@ public class ServiceUserMapperImplTest {
             when(bundle.getSymbolicName()).thenReturn("mock");
         }
 
-        private ServiceRegistration registerService(String string, Object o, Dictionary dictionary) {
-            if (!registrations.containsKey(string)) {
-                registrations.put(string, new HashMap<>());
-            }
-            final Map<Object, Dictionary> serviceRegistrations = registrations.get(string);
-            serviceRegistrations.put(o, dictionary);
+        private ServiceRegistration registerService(String string, Object o, Dictionary<String, Object> dictionary) {
+            final List<Map.Entry<Object, Dictionary<String, Object>>> entries = registrations.computeIfAbsent(string, key -> new ArrayList<>());
+            final Map.Entry<Object, Dictionary<String, Object>> entry = Collections.singletonMap(o, dictionary).entrySet().iterator().next();
 
-            final Object registeredObject = o;
-
+            entries.add(entry);
 
             return new ServiceRegistration() {
                 @Override
@@ -656,19 +654,17 @@ public class ServiceUserMapperImplTest {
 
                 @Override
                 public void unregister() {
-                    serviceRegistrations.remove(registeredObject);
+                    entries.remove(entry);
                 }
             };
         }
 
-        public Map<Object, Dictionary> getRegistrations(String name) {
+        public List<Map.Entry<Object, Dictionary<String, Object>>> getRegistrations(String name) {
             return registrations.get(name);
         }
 
         public BundleContext getBundleContext() {
             return bundleContext;
         }
-
     }
-
 }
