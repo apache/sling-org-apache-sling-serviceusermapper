@@ -133,12 +133,12 @@ public class MappingInventoryPrinter implements InventoryPrinter {
         w.object();
         w.key("title").value("Service User Mappings");
         w.key("mappingsCount").value(data.size());
-        w.key("uniqueUsersCount").value(byUser.keySet().size());
         w.key("uniquePrincipalsCount").value(byPrincipalName.keySet().size());
+        w.key("uniqueUsersCount").value(byUser.keySet().size());
 
-        w.key("mappingsByUser");
+        w.key("mappingsByPrincipal");
         w.object();
-        for(Map.Entry<String, List<Mapping>> e : byUser.entrySet()) {
+        for(Map.Entry<String, List<Mapping>> e : byPrincipalName.entrySet()) {
             w.key(e.getKey());
             w.array();
             for(Mapping m : e.getValue()) {
@@ -148,9 +148,9 @@ public class MappingInventoryPrinter implements InventoryPrinter {
         }
         w.endObject();
 
-        w.key("mappingsByPrincipal");
+        w.key("mappingsByUser (deprecated)");
         w.object();
-        for(Map.Entry<String, List<Mapping>> e : byPrincipalName.entrySet()) {
+        for(Map.Entry<String, List<Mapping>> e : byUser.entrySet()) {
             w.key(e.getKey());
             w.array();
             for(Mapping m : e.getValue()) {
@@ -182,29 +182,29 @@ public class MappingInventoryPrinter implements InventoryPrinter {
     private void renderText(PrintWriter out) {
         final List<Mapping> data = mapper.getActiveMappings();
 
-        final Map<String, List<Mapping>> byUser = getMappingsByUser(data);
-
-        out.print("*** Mappings by user (");
-        out.print(byUser.keySet().size());
-        out.print(" users):");
-        out.println(" (format: service name / sub service name / user)");
-
-        for(Map.Entry<String, List<Mapping>> e : byUser.entrySet()) {
-            out.print("  ");
-            out.println(e.getKey());
-            for(Mapping m : e.getValue()) {
-                asText(out, m, "    ");
-            }
-        }
-
         final Map<String, List<Mapping>> byPrincipalName = getMappingsByPrincipalName(data);
-
+        
         out.print("*** Mappings by principals (");
         out.print(byPrincipalName.keySet().size());
         out.print(" principals):");
         out.println(" (format: service name / sub service name / principal names)");
 
         for(Map.Entry<String, List<Mapping>> e : byPrincipalName.entrySet()) {
+            out.print("  ");
+            out.println(e.getKey());
+            for(Mapping m : e.getValue()) {
+                asText(out, m, "    ");
+            }
+        }
+        
+        final Map<String, List<Mapping>> byUser = getMappingsByUser(data);
+        out.println();
+        out.print("*** Deprecated mappings by user (");
+        out.print(byUser.keySet().size());
+        out.print(" users):");
+        out.println(" (format: service name / sub service name / user)");
+
+        for(Map.Entry<String, List<Mapping>> e : byUser.entrySet()) {
             out.print("  ");
             out.println(e.getKey());
             for(Mapping m : e.getValue()) {

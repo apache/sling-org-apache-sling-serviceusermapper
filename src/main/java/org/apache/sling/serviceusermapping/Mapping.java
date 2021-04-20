@@ -18,6 +18,9 @@
  */
 package org.apache.sling.serviceusermapping;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -32,6 +35,8 @@ public class Mapping implements Comparable<Mapping> {
      * The name of the osgi property holding the service name.
      */
     public static String SERVICENAME = ".serviceName";
+
+    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final String serviceName;
 
@@ -86,6 +91,7 @@ public class Mapping implements Comparable<Mapping> {
         } else {
             this.userName = s;
             this.principalNames = null;
+            log.warn("Deprecated service mapping by userId, refactor to mapping by principal names (e.g. '{}{}=[{}]').", serviceName, ((subServiceName == null) ? "" : ":"+subServiceName) , s);
         }
     }
 

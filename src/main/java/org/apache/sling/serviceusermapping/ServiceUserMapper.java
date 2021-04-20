@@ -77,7 +77,9 @@ public interface ServiceUserMapper {
 	 *         the service. This may be {@code null} if no particular user can
 	 *         be derived for the service identified by the bundle and the
 	 *         optional {@code serviceInfo}.
+	 * @deprecated Use {@link #getServicePrincipalNames(Bundle, String)} instead.        
 	 */
+	@Deprecated
 	String getServiceUserID(Bundle bundle, String subServiceName);
 
 	/**
