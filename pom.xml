@@ -28,7 +28,7 @@
     </parent>
 
     <artifactId>org.apache.sling.serviceusermapper</artifactId>
-    <version>1.5.4</version>
+    <version>1.5.5-SNAPSHOT</version>
 
     <name>Apache Sling Service User Mapper</name>
     <description>
@@ -42,7 +42,7 @@
         <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-serviceusermapper.git</connection>
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-serviceusermapper.git</developerConnection>
         <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-serviceusermapper.git</url>
-      <tag>org.apache.sling.serviceusermapper-1.5.4</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <build>
