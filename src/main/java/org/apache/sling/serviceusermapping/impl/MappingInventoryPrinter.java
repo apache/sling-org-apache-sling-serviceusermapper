@@ -40,6 +40,7 @@ import org.osgi.service.component.annotations.Reference;
                    InventoryPrinter.FORMAT + "=JSON",
                    InventoryPrinter.FORMAT + "=TEXT",
                    InventoryPrinter.TITLE + "=Sling Service User Mappings",
+                   InventoryPrinter.NAME + "=sling-serviceusermappings",
                    InventoryPrinter.WEBCONSOLE + ":Boolean=true"
            })
 public class MappingInventoryPrinter implements InventoryPrinter {
