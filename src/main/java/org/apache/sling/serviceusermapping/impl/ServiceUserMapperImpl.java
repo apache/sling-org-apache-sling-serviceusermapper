@@ -37,6 +37,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import org.apache.sling.serviceusermapping.Mapping;
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
@@ -178,11 +179,11 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.requireValidation = config.require_validation();
 
         if (config.required_user_validators() != null) {
-            requiredUserValidators.addAll(Arrays.asList(config.required_user_validators()));
+            requiredUserValidators.addAll(filterEmptyStringValues(config.required_user_validators()));
         }
 
         if (config.required_principal_validators() != null) {
-            requiredPrincipalValidators.addAll(Arrays.asList(config.required_principal_validators()));
+            requiredPrincipalValidators.addAll(filterEmptyStringValues(config.required_principal_validators()));
         }
 
         RegistrationSet registrationSet = this.updateMappings();
@@ -557,6 +558,10 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private List<ServicePrincipalsValidator> getPrincipalsValidators() {
         return getValidatorsIfPresent(principalsValidators);
+    }
+
+    private List<String> filterEmptyStringValues(String[] arr) {
+        return Arrays.stream(arr).filter(p -> !p.trim().isEmpty()).collect(Collectors.toList());
     }
 
     private <T> List<T> getValidatorsIfPresent(List<T> validators) {
