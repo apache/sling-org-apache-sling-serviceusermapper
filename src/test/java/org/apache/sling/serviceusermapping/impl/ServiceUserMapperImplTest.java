@@ -50,6 +50,8 @@ import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 public class ServiceUserMapperImplTest {
     private static final String BUNDLE_SYMBOLIC1 = "bundle1";
@@ -156,6 +158,36 @@ public class ServiceUserMapperImplTest {
 
         assertFalse(mapper.areValidPrincipals(Collections.singletonList("baz"), "org", "foo", false));
         assertFalse(mapper.areValidPrincipals(Collections.singletonList("baz"), "org", "foo", true));
+    }
+
+    @Test
+    public void test_emptyRequiredUserAndPrincipalValidators() {
+        ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.require_validation()).thenReturn(true);
+        when(config.required_user_validators()).thenReturn(new String[] {"mockRUV", ""});
+        when(config.required_principal_validators()).thenReturn(new String[] {"mockRPV", ""});
+
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(null, config);
+
+        List<String> principalNames = Collections.singletonList("bla");
+
+        ServiceUserValidator userValidator = mock(ServiceUserValidator.class);
+        when(userValidator.isValid("alice", "org", "foo")).thenReturn(true);
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(VALIDATOR_ID, "mockRUV");
+        mapper.bindServiceUserValidator(userValidator, properties);
+
+        ServicePrincipalsValidator principalsValidator = mock(ServicePrincipalsValidator.class);
+        when(principalsValidator.isValid(principalNames, "org", "foo")).thenReturn(true);
+        properties.put(VALIDATOR_ID, "mockRPV");
+        mapper.bindServicePrincipalsValidator(principalsValidator, properties);
+
+        // empty validators should be skipped
+        assertTrue(mapper.isValidUser("alice", "org", "foo", true));
+        verify(userValidator, times(1)).isValid("alice", "org", "foo");
+
+        assertTrue(mapper.areValidPrincipals(principalNames, "org", "foo", true));
+        verify(principalsValidator, times(1)).isValid(principalNames,"org", "foo");
     }
 
     @Test

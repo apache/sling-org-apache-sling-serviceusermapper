@@ -177,13 +177,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
-        if (config.required_user_validators() != null) {
-            requiredUserValidators.addAll(Arrays.asList(config.required_user_validators()));
-        }
-
-        if (config.required_principal_validators() != null) {
-            requiredPrincipalValidators.addAll(Arrays.asList(config.required_principal_validators()));
-        }
+        requiredUserValidators.addAll(filterEmptyValidatorsConfigs(config.required_user_validators(), "Required User Validators"));
+        requiredPrincipalValidators.addAll(filterEmptyValidatorsConfigs(config.required_principal_validators(), "Required Principal Validators"));
 
         RegistrationSet registrationSet = this.updateMappings();
 
@@ -557,6 +552,23 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
 
     private List<ServicePrincipalsValidator> getPrincipalsValidators() {
         return getValidatorsIfPresent(principalsValidators);
+    }
+
+    private List<String> filterEmptyValidatorsConfigs(String[] configurations, String configurationName) {
+        List<String> filteredList = new ArrayList<>();
+        if (configurations == null) {
+            return filteredList;
+        }
+
+        for(String config: configurations) {
+            if (config.trim().isEmpty()) {
+                log.warn("Skipped empty value in {} configuration.", configurationName);
+                continue;
+            }
+            filteredList.add(config);
+        }
+
+        return filteredList;
     }
 
     private <T> List<T> getValidatorsIfPresent(List<T> validators) {
