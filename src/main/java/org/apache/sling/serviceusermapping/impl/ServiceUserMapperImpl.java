@@ -37,7 +37,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 import org.apache.sling.serviceusermapping.Mapping;
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
@@ -178,13 +177,8 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         this.useDefaultMapping = config.user_enable_default_mapping();
         this.requireValidation = config.require_validation();
 
-        if (config.required_user_validators() != null) {
-            requiredUserValidators.addAll(filterEmptyStringValues(config.required_user_validators()));
-        }
-
-        if (config.required_principal_validators() != null) {
-            requiredPrincipalValidators.addAll(filterEmptyStringValues(config.required_principal_validators()));
-        }
+        requiredUserValidators.addAll(filterEmptyValidatorsConfigs(config.required_user_validators(), "Required User Validators"));
+        requiredPrincipalValidators.addAll(filterEmptyValidatorsConfigs(config.required_principal_validators(), "Required Principal Validators"));
 
         RegistrationSet registrationSet = this.updateMappings();
 
@@ -560,8 +554,21 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         return getValidatorsIfPresent(principalsValidators);
     }
 
-    private List<String> filterEmptyStringValues(String[] arr) {
-        return Arrays.stream(arr).filter(p -> !p.trim().isEmpty()).collect(Collectors.toList());
+    private List<String> filterEmptyValidatorsConfigs(String[] configurations, String configurationName) {
+        List<String> filteredList = new ArrayList<>();
+        if (configurations == null) {
+            return filteredList;
+        }
+
+        for(String config: configurations) {
+            if (config.trim().isEmpty()) {
+                log.warn("Skipped empty value in {} configuration.", configurationName);
+                continue;
+            }
+            filteredList.add(config);
+        }
+
+        return filteredList;
     }
 
     private <T> List<T> getValidatorsIfPresent(List<T> validators) {
