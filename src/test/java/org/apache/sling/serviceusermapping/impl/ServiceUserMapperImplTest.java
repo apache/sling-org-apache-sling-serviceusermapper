@@ -37,8 +37,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
 
 import static org.apache.sling.serviceusermapping.ServiceUserMapper.VALIDATOR_ID;
@@ -48,7 +51,10 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
@@ -648,6 +654,174 @@ public class ServiceUserMapperImplTest {
         assertEquals(4, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
     }
 
+
+    @Test
+    public void test_unbindValidatorWithoutRejectionsKeepsServicesRegistered() {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), synchronousExecutor());
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> true;
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+        assertEqualPrincipalNames(mapper.getServicePrincipalNames(BUNDLE1, null), SAMPLE);
+        clearInvocations(context.getBundleContext());
+
+        mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+
+        verify(context.getBundleContext(), never()).registerService(eq(ServiceUserMappedImpl.SERVICEUSERMAPPED), any(), any(Dictionary.class));
+        assertEquals(2, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+    }
+
+    @Test
+    public void test_unbindRejectingValidatorRestartsServices() {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), synchronousExecutor());
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> false;
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+        assertNull(mapper.getServicePrincipalNames(BUNDLE1, null));
+        clearInvocations(context.getBundleContext());
+
+        mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+
+        verifyServicesRegistered(context, 2);
+    }
+
+    @Test
+    public void test_validatorUnboundWhileRejectingRestartsServices() {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), synchronousExecutor());
+        final ServicePrincipalsValidator[] validator = new ServicePrincipalsValidator[1];
+        validator[0] = (principals, serviceName, subServiceName) -> {
+            mapper.unbindServicePrincipalsValidator(validator[0], Collections.emptyMap());
+            return false;
+        };
+        mapper.bindServicePrincipalsValidator(validator[0], Collections.emptyMap());
+        clearInvocations(context.getBundleContext());
+
+        assertNull(mapper.getServicePrincipalNames(BUNDLE1, null));
+
+        verifyServicesRegistered(context, 2);
+    }
+
+    @Test
+    public void test_unbindLastValidatorWithRequiredValidationRestartsServices() {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(true), synchronousExecutor());
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> true;
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+        clearInvocations(context.getBundleContext());
+
+        mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+
+        verifyServicesRegistered(context, 2);
+    }
+
+    @Test(timeout = 10000)
+    public void test_validatorUnboundConcurrentlyWhileRejectingRestartsServices() throws Exception {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), synchronousExecutor());
+        final CountDownLatch validating = new CountDownLatch(1);
+        final CountDownLatch unbound = new CountDownLatch(1);
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> {
+            validating.countDown();
+            await(unbound);
+            return false;
+        };
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+        clearInvocations(context.getBundleContext());
+
+        final ExecutorService validation = Executors.newSingleThreadExecutor();
+        try {
+            final Future<Iterable<String>> principals = validation.submit(() -> mapper.getServicePrincipalNames(BUNDLE1, null));
+            await(validating);
+            // blocks until the timeout if the validator runs while holding the mapper lock
+            mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+            unbound.countDown();
+            assertNull(principals.get());
+        } finally {
+            validation.shutdownNow();
+        }
+
+        verifyServicesRegistered(context, 2);
+    }
+
+    @Test(timeout = 10000)
+    public void test_validatorUnboundAfterConcurrentRejectionRestartsServices() throws Exception {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), synchronousExecutor());
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> false;
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+        clearInvocations(context.getBundleContext());
+
+        final ExecutorService validation = Executors.newSingleThreadExecutor();
+        try {
+            assertNull(validation.submit(() -> mapper.getServicePrincipalNames(BUNDLE1, null)).get());
+        } finally {
+            validation.shutdownNow();
+        }
+        mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+
+        verifyServicesRegistered(context, 2);
+    }
+
+    @Test(timeout = 10000)
+    public void test_rejectionAfterDeactivationSubmitsNoWork() throws Exception {
+        final ServiceRegistrationContextHelper context = new ServiceRegistrationContextHelper();
+        final ExecutorService executor = synchronousExecutor();
+        final ServiceUserMapperImpl mapper = new ServiceUserMapperImpl(context.getBundleContext(), principalMappingConfig(false), executor);
+        final CountDownLatch validating = new CountDownLatch(1);
+        final CountDownLatch deactivated = new CountDownLatch(1);
+        final ServicePrincipalsValidator validator = (principals, serviceName, subServiceName) -> {
+            validating.countDown();
+            await(deactivated);
+            return false;
+        };
+        mapper.bindServicePrincipalsValidator(validator, Collections.emptyMap());
+
+        final ExecutorService validation = Executors.newSingleThreadExecutor();
+        try {
+            final Future<Iterable<String>> principals = validation.submit(() -> mapper.getServicePrincipalNames(BUNDLE1, null));
+            await(validating);
+            mapper.deactivate();
+            mapper.unbindServicePrincipalsValidator(validator, Collections.emptyMap());
+            clearInvocations(executor);
+            deactivated.countDown();
+            assertNull(principals.get());
+        } finally {
+            validation.shutdownNow();
+        }
+
+        verify(executor, never()).submit(any(Runnable.class));
+    }
+
+    private static void await(final CountDownLatch latch) {
+        try {
+            assertTrue(latch.await(5, TimeUnit.SECONDS));
+        } catch (final InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(e);
+        }
+    }
+
+    private static ServiceUserMapperImpl.Config principalMappingConfig(final boolean requireValidation) {
+        final ServiceUserMapperImpl.Config config = mock(ServiceUserMapperImpl.Config.class);
+        when(config.user_mapping()).thenReturn(new String[] {BUNDLE_SYMBOLIC1 + "=[" + SAMPLE + "]"});
+        when(config.user_enable_default_mapping()).thenReturn(true);
+        when(config.require_validation()).thenReturn(requireValidation);
+        return config;
+    }
+
+    private static ExecutorService synchronousExecutor() {
+        final ExecutorService executor = mock(ExecutorService.class);
+        when(executor.submit(any(Runnable.class))).thenAnswer(invocation -> {
+            invocation.<Runnable>getArgument(0).run();
+            return null;
+        });
+        return executor;
+    }
+
+    private static void verifyServicesRegistered(final ServiceRegistrationContextHelper context, final int count) {
+        verify(context.getBundleContext(), times(count)).registerService(eq(ServiceUserMappedImpl.SERVICEUSERMAPPED), any(), any(Dictionary.class));
+        assertEquals(count, context.getRegistrations(ServiceUserMappedImpl.SERVICEUSERMAPPED).size());
+    }
 
     private static class ServiceRegistrationContextHelper {
 
