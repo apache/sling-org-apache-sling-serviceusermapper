@@ -37,6 +37,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.apache.sling.serviceusermapping.Mapping;
 import org.apache.sling.serviceusermapping.ServicePrincipalsValidator;
@@ -112,6 +113,15 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     private final List<ServiceUserValidator> userValidators = new CopyOnWriteArrayList<>();
 
     private final List<ServicePrincipalsValidator> principalsValidators = new CopyOnWriteArrayList<>();
+
+    /** Validators which rejected while effective, guarded by {@code this}. */
+    private final Set<ServiceUserValidator> rejectingUserValidators = new HashSet<>();
+
+    /** Validators which rejected while effective, guarded by {@code this}. */
+    private final Set<ServicePrincipalsValidator> rejectingPrincipalsValidators = new HashSet<>();
+
+    /** Guarded by {@code this}. */
+    private boolean deactivated;
 
     private final AtomicReference<ServiceRegistration> defaultRegistration = new AtomicReference<>();
 
@@ -190,6 +200,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         // this call does not unregister the mappings, but they should be unbound
         // through the unbind methods anyway
         updateServiceRegistrations(new Mapping[0]);
+        deactivated = true;
         executorService.shutdown();
     }
 
@@ -222,13 +233,16 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * @param serviceUserValidator
      */
     protected synchronized void unbindServiceUserValidator(final ServiceUserValidator serviceUserValidator, final Map<String, ?> props) {
+        final List<ServiceUserValidator> userValidatorsBefore = new ArrayList<>(getUserValidators());
+        final List<ServicePrincipalsValidator> principalsValidatorsBefore = new ArrayList<>(getPrincipalsValidators());
         userValidators.remove(serviceUserValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
             presentUserValidators.remove(id);
         }
 
-        restartAllActiveServiceUserMappedServices();
+        restartIfVisibilityMayHaveChanged(userValidatorsBefore, principalsValidatorsBefore);
+        rejectingUserValidators.remove(serviceUserValidator);
     }
 
     /**
@@ -253,12 +267,75 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
      * @param servicePrincipalsValidator
      */
     protected synchronized void unbindServicePrincipalsValidator(final ServicePrincipalsValidator servicePrincipalsValidator, final Map<String, ?> props) {
+        final List<ServiceUserValidator> userValidatorsBefore = new ArrayList<>(getUserValidators());
+        final List<ServicePrincipalsValidator> principalsValidatorsBefore = new ArrayList<>(getPrincipalsValidators());
         principalsValidators.remove(servicePrincipalsValidator);
         Object id = props.get(VALIDATOR_ID);
         if (id instanceof String) {
             presentPrincipalValidators.remove(id);
         }
-        restartAllActiveServiceUserMappedServices();
+        restartIfVisibilityMayHaveChanged(userValidatorsBefore, principalsValidatorsBefore);
+        rejectingPrincipalsValidators.remove(servicePrincipalsValidator);
+    }
+
+    /**
+     * Restarts all active service user mappings if the visibility of any service user mapping may have changed due to the change in validators.
+     * 
+     * <p>This method removes some unnecessary service mapping restarts, which can have cascading effects.</p>
+
+     * <p>Note: must be invoked before clearing {@link #rejectingPrincipalsValidators} and {@link #rejectingUserValidators}.</p>
+     */
+    private void restartIfVisibilityMayHaveChanged(final List<ServiceUserValidator> userValidatorsBefore,
+            final List<ServicePrincipalsValidator> principalsValidatorsBefore) {
+        final List<ServiceUserValidator> userValidatorsAfter = getUserValidators();
+        final List<ServicePrincipalsValidator> principalsValidatorsAfter = getPrincipalsValidators();
+        
+        // if validation is required and one of the validator lists transitioned from non-empty to empty services may be hidden
+        final boolean mayHide = requireValidation
+                && (isNoLongerValidated(userValidatorsBefore, userValidatorsAfter)
+                        || isNoLongerValidated(principalsValidatorsBefore, principalsValidatorsAfter));
+        // if a validator that previously rejected is removed services may now become visible
+        final boolean mayReveal = hasRemovedRejectingValidator(userValidatorsBefore, userValidatorsAfter, rejectingUserValidators)
+                || hasRemovedRejectingValidator(principalsValidatorsBefore, principalsValidatorsAfter, rejectingPrincipalsValidators);
+        if (mayHide || mayReveal) {
+            restartAllActiveServiceUserMappedServices();
+        }
+    }
+
+    private static boolean isNoLongerValidated(final List<?> before, final List<?> after) {
+        return !before.isEmpty() && after.isEmpty();
+    }
+
+    /**
+     * Check if a validator was removed which rejected while it was effective, so that services which were rejected by it may now be visible.
+     * 
+     * @param <T> the type of validator
+     * @param before the previous list of validators
+     * @param after the current list of validators
+     * @param rejecting the set of validators which rejected while they were effective
+     * @return true if a validator was removed which rejected while it was effective, false otherwise
+     */
+    private static <T> boolean hasRemovedRejectingValidator(final List<T> before, final List<T> after, final Set<T> rejecting) {
+        for (final T validator : before) {
+            if (rejecting.contains(validator) && !after.contains(validator)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Called after a validator rejected while it was effective.
+     * 
+     * <p>If the service was unregistered in the meantime, its unbind could not account for the rejection in 
+     * {@link #restartIfVisibilityMayHaveChanged(List, List)}, so restart the services here instead.</p>
+     */
+    private synchronized <T> void validatorRejected(final T validator, final Set<T> rejecting, final Supplier<List<T>> effectiveValidators) {
+        if (effectiveValidators.get().contains(validator)) {
+            rejecting.add(validator);
+        } else {
+            restartAllActiveServiceUserMappedServices();
+        }
     }
 
     /**
@@ -398,6 +475,9 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
     }
 
     private void executeServiceRegistrationsAsync(final RegistrationSet registrationSet) {
+        if (deactivated) {
+            return;
+        }
         executorService.submit(() -> executeServiceRegistrations(registrationSet));
     }
 
@@ -511,6 +591,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         } else {
             for (final ServiceUserValidator validator : validators) {
                 if (!validator.isValid(userId, serviceName, subServiceName)) {
+                    validatorRejected(validator, rejectingUserValidators, this::getUserValidators);
                     log.debug("isValidUser: Validator {} doesn't accept userId '{}' -> invalid", validator, userId);
                     return false;
                 }
@@ -537,6 +618,7 @@ public class ServiceUserMapperImpl implements ServiceUserMapper {
         } else {
             for (final ServicePrincipalsValidator validator : validators) {
                 if (!validator.isValid(principalNames, serviceName, subServiceName)) {
+                    validatorRejected(validator, rejectingPrincipalsValidators, this::getPrincipalsValidators);
                     log.debug("areValidPrincipals: Validator {} doesn't accept principal names [{}] -> invalid", validator, principalNames);
                     return false;
                 }
